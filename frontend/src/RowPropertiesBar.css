@@ -1,0 +1,7 @@
+/* Same centered-reading-column width as Editor.css's .editor-shell,
+   which this sits directly above -- otherwise the property list would
+   be full-bleed while the editor content beneath it stays narrow. */
+.row-properties-bar {
+  width: 100%;
+  max-width: var(--content-max-width, 60rem);
+}

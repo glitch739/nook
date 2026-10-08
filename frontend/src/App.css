@@ -1,0 +1,206 @@
+.theme-toggle {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.theme-toggle:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.centered {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 21rem;
+  padding: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  box-shadow: var(--shadow-md);
+}
+
+.card h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.card input {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.card input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  outline-offset: 1px;
+}
+
+.card button {
+  padding: 0.7rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.card button:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.workspace {
+  --content-max-width: min(60rem, 100%);
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* TabBar (see TabBar.css) spans the full workspace width, unpadded --
+   the body below it IS the page: one continuous solid surface filling
+   the rest of the screen (not a bordered/shadowed card floating on the
+   aurora background, see ADR-less note in Editor.css) -- only the text
+   column inside it is centered/max-width-constrained, matching Notion's
+   actual layout: full-bleed page, centered reading column. */
+.workspace-body {
+  /* Named so a full-bleed child (PageCover.css's .has-cover) can
+     negative-margin itself back out to the real edges without
+     hardcoding a second copy of these two numbers. */
+  --ws-pad-x: 2.5rem;
+  --ws-pad-y: 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: var(--ws-pad-y) var(--ws-pad-x);
+  overflow-y: auto;
+  background: var(--surface-solid);
+}
+
+/* Dark mode only: the open page reads as one shade blacker than the
+   sidebar, per direct request -- --surface-solid stays the shared
+   "elevated surface" shade every popover/card also uses, so this
+   overrides just the page body's own background rather than changing
+   that token (which would also lighten every popover). --bg is already
+   the darkest flat tone in dark mode (see index.css) and, since dark
+   mode dropped the aurora blobs, is otherwise only ever visible behind
+   everything else -- reusing it here needs no new token. */
+:root[data-theme='dark'] .workspace-body {
+  background: var(--bg);
+}
+
+.workspace-body .hint {
+  width: 100%;
+  max-width: var(--content-max-width);
+}
+
+/* ---- Auth screen (AuthScreen.tsx) ---- */
+.auth-card {
+  width: min(23rem, calc(100vw - 2rem));
+}
+
+.auth-subtitle {
+  margin: -0.75rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--icon-green) 14%, transparent);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.card button.link-button,
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.card button.link-button:hover,
+.link-button:hover {
+  color: var(--text);
+  box-shadow: none;
+  text-decoration: underline;
+}
+
+.card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

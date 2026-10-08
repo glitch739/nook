@@ -1,0 +1,312 @@
+/* Property cell editors, select/status pills and their popover, and the
+   label/value property list. Imported by PropertyCell.tsx itself rather
+   than living in DatabaseView.css: DatabaseView is a lazy chunk, and a database
+   row opened as its own page (RowPropertiesBar) renders these cells
+   without that chunk ever loading -- after a page refresh the cells
+   came up completely unstyled. */
+
+/* -- Cell editors (shared by the table and RowDetailPanel) -- */
+
+.cell-empty {
+  color: var(--text-faint, var(--text-muted));
+  opacity: 0.7;
+}
+
+.cell-text-btn,
+.cell-select-btn {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.25rem 0.3rem;
+  border-radius: var(--radius-sm);
+  min-height: 1.6rem;
+  align-items: center;
+}
+
+.cell-text-btn:hover,
+.cell-select-btn:hover {
+  background: var(--surface-hover-strong);
+}
+
+.cell-text-input,
+.cell-date-input,
+.cell-number-input {
+  width: 100%;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+}
+
+.cell-date-input,
+.cell-number-input {
+  border-color: var(--border);
+}
+
+.cell-checkbox-input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.select-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.12rem 0.6rem 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pill-color) 34%, transparent);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.select-pill-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--pill-color);
+}
+
+.select-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -- Select/status popover -- */
+
+.select-popover {
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+}
+
+.select-popover-options {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* Room for the swatches' focus/selection rings (box-shadow), which
+     this scroll container would otherwise clip at its edges. */
+  padding: 0.25rem;
+  margin: -0.25rem;
+}
+
+.select-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.select-option-swatch {
+  flex-shrink: 0;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.select-option-swatch:hover,
+.select-option-swatch[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--surface-solid), 0 0 0 3px var(--text-muted);
+}
+
+/* 11 presets + the custom swatch = 12, laid out as two even rows of 6. */
+.select-color-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1.15rem);
+  gap: 0.5rem 0.6rem;
+  padding: 0.45rem 0.3rem 0.55rem 1.25rem;
+}
+
+.select-color-choice,
+.select-color-custom {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.select-color-choice:hover,
+.select-color-custom:hover {
+  transform: scale(1.15);
+}
+
+.select-color-choice.is-current,
+.select-color-custom.is-current {
+  box-shadow: 0 0 0 2px var(--surface-solid), 0 0 0 3.5px var(--text);
+}
+
+/* "Custom color": a rainbow swatch with the native color input laid
+   invisibly over it, so a click opens the OS picker. */
+.select-color-custom {
+  position: relative;
+  overflow: hidden;
+  background: conic-gradient(#f87171, #fbbf24, #4ade80, #38bdf8, #c084fc, #f87171);
+}
+
+.select-color-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.select-option-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0.3rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-option-label:hover {
+  background: var(--surface-hover);
+}
+
+.select-option-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+}
+
+.select-option-edit,
+.select-option-remove {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.select-option-row:hover .select-option-edit,
+.select-option-row:hover .select-option-remove {
+  opacity: 1;
+}
+
+.select-option-edit:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.select-option-remove:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.select-popover-add {
+  display: flex;
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+
+/* -- Property list (row detail peek and RowPropertiesBar) -- */
+
+.row-detail-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.row-detail-property {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* .cell-date-input's own width: 100% (above, shared with the
+   table's date cells) fills the whole 1fr value column here -- a date
+   is a fixed, short format, so that left a wide, mostly-empty bordered
+   box trailing off past the actual "2026. 09. 20." text. width: auto
+   alone doesn't undo that: .row-detail-property is a grid container,
+   and a grid item's default justify-self is *stretch* -- that's a
+   separate mechanism from the item's own width and overrides "auto"
+   sizing to still fill the whole grid cell regardless. justify-self:
+   start is what actually turns stretching off, letting auto then
+   really mean "size to your own content" the way it already does for
+   this same input in a table cell (a plain table-cell, no grid/flex
+   stretch behavior on its content, is why that context never showed
+   the problem in the first place). */
+.row-detail-property .cell-date-input {
+  width: auto;
+  justify-self: start;
+}
+
+.row-detail-property-name {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.row-detail-no-properties {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* -- Person cell (shares the status popover's look) -- */
+.person-filter {
+  margin: 0 0 0.3rem;
+  padding: 0 0 0.3rem;
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.person-note {
+  margin: 0.4rem 0.3rem;
+  font-size: 0.85rem;
+}
+
+.person-username {
+  color: var(--text-muted);
+  font-size: 0.8em;
+}
+
+.select-option-label.is-chosen {
+  font-weight: 600;
+}
+

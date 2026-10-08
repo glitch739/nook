@@ -1,0 +1,90 @@
+/* Command palette (CommandPalette.tsx): reuses .modal-backdrop. */
+.palette-backdrop {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  width: min(36rem, 100%);
+  max-height: min(28rem, 70vh);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+}
+
+.palette-input {
+  padding: 0.95rem 1.1rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
+.palette-list {
+  margin: 0;
+  padding: 0.35rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.palette-item.active {
+  background: var(--surface-hover-strong);
+}
+
+.palette-icon {
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+}
+
+.palette-icon svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.palette-label {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-empty {
+  padding: 1.5rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  :root .palette-backdrop {
+    padding-top: 0.5rem;
+  }
+}

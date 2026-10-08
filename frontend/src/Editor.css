@@ -1,0 +1,794 @@
+/* Deliberately NOT a floating card (no border/radius/shadow/blur) --
+   the page canvas itself (.workspace-body, see App.css) carries the
+   solid background now. This is the page, not a window sitting on top
+   of one, matching Notion: the content area is one continuous surface
+   behind the sidebar/tab bar, not a separate bordered panel. */
+.editor-shell {
+  width: 100%;
+  max-width: var(--content-max-width, 60rem);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.6rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-solid);
+}
+
+.toolbar-btn {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.toolbar-btn:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.editor-content {
+  padding: 1.75rem 2rem;
+  min-height: 20rem;
+}
+
+.editor-content .ProseMirror {
+  outline: none;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+/* @tiptap/extension-placeholder ships no default styling -- it just
+   marks empty nodes with a class + data-placeholder attribute, this is
+   what actually renders it. Without this, an empty paragraph has no
+   visible content at all: indistinguishable from no block being there. */
+.editor-content .ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.editor-content ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+
+/* align-items: flex-start, not center -- center was fine for a plain,
+   single-line item, but a task item's content div holds its own <p>
+   *and*, once Tab nests a sub-item under it (TaskItem.configure({
+   nested: true })), a whole sub-<ul> too. Centering the row then
+   centers the checkbox against that entire, now much taller div
+   instead of just its own text line, visibly detaching it from the
+   text next to it. flex-start alone would leave the checkbox floating
+   above a single line of text instead (nothing below to center
+   against), so it's paired with the fixed line-height on the label
+   below -- that's what actually keeps a plain item's checkbox
+   centered on its own text, unconditionally, whether or not the item
+   ends up with nested content later. (A previous version of this
+   switched align-items conditionally based on :has(> div > ul) --
+   correct in principle, but toggling between two different alignment
+   algorithms for the same row depending on runtime content turned out
+   to round to very slightly different pixel positions between the two
+   states, which is exactly the kind of thing a fixed-height, always-
+   the-same-algorithm approach avoids.) */
+.editor-content ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.15rem 0;
+}
+
+/* The real source of the big gaps between to-do items wasn't the li's
+   own margin above -- it's each item's content wrapped in an ordinary
+   <p>, which was picking up the generic .editor-content p top/bottom
+   margin like any other paragraph. Two adjacent items' margins stacked
+   into a much bigger visual gap than the li margin alone suggested. */
+.editor-content ul[data-type='taskList'] li > div p {
+  margin: 0;
+}
+
+.editor-content ul[data-type='taskList'] li > label {
+  display: flex;
+  align-items: center;
+  /* Matches .ProseMirror's line-height (1.65, unitless so this em
+     resolves off the label's own font-size, same as the paragraph
+     next to it) -- gives the label a fixed height equal to exactly one
+     text line, so centering the checkbox *within the label* lines it
+     up with that first line specifically, regardless of the li's own
+     align-items or how tall the rest of the content div ends up being. */
+  height: 1.65em;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Browsers give a native checkbox its own default margin (varies by
+   engine), which is what actually threw the box off-center against the
+   text next to it -- the old fixed margin-top on the label was
+   compensating for that blind. Resetting the checkbox itself and
+   centering both the label and the row via flex is what makes it line
+   up regardless of engine defaults. */
+.editor-content ul[data-type='taskList'] li > label input[type='checkbox'] {
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0;
+  cursor: pointer;
+}
+
+.editor-content ul[data-type='taskList'] li > div {
+  flex: 1;
+}
+
+.editor-content ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.editor-content h1 {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.5rem;
+}
+
+.editor-content h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.1rem 0 0.5rem;
+}
+
+.editor-content p {
+  margin: 0.5rem 0;
+}
+
+.editor-content ul,
+.editor-content ol {
+  padding-left: 1.5rem;
+}
+
+.editor-content blockquote {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* The "---" divider (StarterKit's HorizontalRule) was rendering as a
+   bare <hr> with no rule of its own here -- every browser's UA default
+   for that is a two-tone inset/outset border that reads as too light
+   against a dark background. --text-muted is the same grey the empty-
+   paragraph placeholder text already uses (.is-empty::before below). */
+.editor-content hr {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--text-muted);
+}
+
+/* Every <pre> in the document comes from the CodeBlock node view
+   (CodeBlockView.tsx) now, sitting right below its .code-block-header
+   language-picker bar -- hence the flat top corners here and the
+   rounded ones on the header instead. */
+.editor-content pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  margin: 0;
+  padding: 0.85rem 1.1rem;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  overflow-x: auto;
+}
+
+.editor-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+/* Inline code in running text (and table cells): the `code` mark,
+   applied by typing `text`, Cmd/Ctrl+E, the toolbar, or pasting HTML
+   that contains <code> (e.g. copied from ChatGPT). */
+.editor-content :not(pre) > code {
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  background: var(--inline-code-bg);
+  color: var(--inline-code-text);
+  font-size: 0.85em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.code-block-view {
+  margin: 0.5rem 0;
+}
+
+.code-block-header {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.35rem 0.5rem;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.code-lang-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--code-text);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.code-lang-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.code-lang-chevron {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.code-lang-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 5;
+  width: 14rem;
+  max-height: 16rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.code-lang-search {
+  margin: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.code-lang-list {
+  overflow-y: auto;
+  padding: 0.2rem;
+}
+
+.code-lang-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.code-lang-item:hover,
+.code-lang-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.code-lang-empty {
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* lowlight/highlight.js token classes -- see the --hljs-* tokens in
+   index.css. One fixed palette, not a light/dark pair: --code-bg stays
+   dark in both app themes, so the tokens tuned against it don't need
+   to change either. */
+.editor-content .hljs-comment,
+.editor-content .hljs-quote {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+
+.editor-content .hljs-keyword,
+.editor-content .hljs-selector-tag,
+.editor-content .hljs-tag {
+  color: var(--hljs-keyword);
+}
+
+.editor-content .hljs-string,
+.editor-content .hljs-doctag,
+.editor-content .hljs-regexp {
+  color: var(--hljs-string);
+}
+
+.editor-content .hljs-number,
+.editor-content .hljs-literal {
+  color: var(--hljs-number);
+}
+
+.editor-content .hljs-title,
+.editor-content .hljs-section {
+  color: var(--hljs-function);
+}
+
+.editor-content .hljs-attr,
+.editor-content .hljs-attribute,
+.editor-content .hljs-symbol,
+.editor-content .hljs-bullet {
+  color: var(--hljs-attr);
+}
+
+.editor-content .hljs-built_in,
+.editor-content .hljs-type,
+.editor-content .hljs-class .hljs-title {
+  color: var(--hljs-builtin);
+}
+
+.editor-content .hljs-variable,
+.editor-content .hljs-template-variable,
+.editor-content .hljs-name {
+  color: var(--hljs-variable);
+}
+
+.editor-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.editor-content .hljs-strong {
+  font-weight: 700;
+}
+
+/* The "/" slash-command popup (SlashCommand.tsx / SlashCommandMenu.tsx)
+   -- mounted via @tiptap/suggestion's floating-ui positioning, anchored
+   to the cursor, not nested under .editor-content in the DOM. */
+.slash-menu {
+  width: 15rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.slash-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.slash-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slash-menu-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.slash-menu-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.slash-menu-empty {
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ---- Realtime collaboration (ADR 0006) ---- */
+.collab-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.collab-peers {
+  display: flex;
+}
+
+.collab-peer {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: -0.35rem;
+  border: 2px solid var(--surface-solid);
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.collab-state {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.collab-state-offline {
+  color: var(--danger);
+}
+
+/* Remote carets (CollaborationCaret's default markup). */
+.collaboration-carets__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid #0d0d0d;
+  border-right: 1px solid #0d0d0d;
+  word-break: normal;
+  pointer-events: none;
+}
+
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ProseMirror-yjs-selection {
+  opacity: 0.35;
+}
+
+/* Keep toolbar buttons on one line each; wrap the row instead when the
+   page is narrow (split view), so the collab status never squeezes them. */
+.toolbar {
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
+}
+
+.toolbar-btn {
+  white-space: nowrap;
+}
+
+/* Status + avatars: keep clear of the toolbar's right edge and never
+   shrink/clip (screenshot 2026-09-28: "Mentve" flush against the edge,
+   avatars sliding off). */
+.collab-status {
+  flex-shrink: 0;
+  padding: 0 0.75rem 0 0.5rem;
+}
+
+.collab-peers {
+  padding-left: 0.35rem; /* room for the first avatar's negative overlap */
+}
+
+.collab-peers:empty {
+  display: none;
+}
+
+/* ---- Tables inside a page's text (TableKit, see Editor.tsx) ---- */
+.editor-content .tableWrapper {
+  margin: 1rem 0;
+  overflow-x: auto; /* wide tables scroll instead of widening the page */
+}
+
+.editor-content table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.editor-content td,
+.editor-content th {
+  position: relative;
+  min-width: 4rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.editor-content th {
+  font-weight: 600;
+  text-align: left;
+  background: var(--surface-hover);
+}
+
+/* Cells hold paragraphs; drop their outer margins so a one-line cell
+   stays one line tall. */
+.editor-content td > *,
+.editor-content th > * {
+  margin: 0;
+}
+
+.editor-content td > * + *,
+.editor-content th > * + * {
+  margin-top: 0.4rem;
+}
+
+/* Multi-cell selection (drag across cells, then merge). */
+.editor-content .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--icon-blue) 18%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Drag handle on a column's right border (resizable: true). */
+.editor-content .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: var(--icon-blue);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.editor-content.resize-cursor,
+.editor-content .resize-cursor {
+  cursor: col-resize;
+}
+
+/* Contextual table controls (TableMenu.tsx): a floating glass bar
+   right above the table the cursor is in, portaled into <body> and
+   positioned with position: fixed from the table's rect. */
+.table-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.45rem;
+  max-width: calc(100vw - 16px);
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+  backdrop-filter: blur(var(--blur)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
+  box-shadow: var(--shadow-md);
+  animation: table-menu-in 140ms ease-out;
+}
+
+@keyframes table-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.table-menu-group {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.table-menu-group + .table-menu-group {
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--border);
+}
+
+.table-menu-btn {
+  padding: 0.25rem 0.55rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.table-menu-btn:hover:not(:disabled) {
+  background: var(--surface-hover-strong);
+}
+
+.table-menu-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.table-menu-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.table-menu-btn.danger {
+  color: var(--danger);
+}
+
+.toolbar-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--inline-code-text);
+}
+
+.toolbar-btn.active .toolbar-inline-code {
+  color: inherit;
+}
+
+/* -- Images inside the text (imageUpload.ts) ------------------------- */
+
+.editor-content [data-resize-container][data-node='image'] {
+  margin: 12px 0;
+  justify-content: flex-start;
+}
+.editor-content [data-resize-wrapper] {
+  max-width: 100%;
+}
+.editor-content img {
+  display: block;
+  max-width: 100%;
+  /* The resize handles set an explicit px height while dragging; the
+     aspect ratio is locked, so auto keeps it correct when max-width
+     kicks in on a narrow window. */
+  height: auto !important;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.15s ease;
+}
+.editor-content .ProseMirror-selectednode img,
+.editor-content img.ProseMirror-selectednode {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--icon-blue) 55%, transparent);
+}
+
+/* Corner handles: only visible while hovering or resizing the image. */
+.editor-content [data-resize-handle] {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface-solid);
+  border: 1.5px solid var(--icon-blue);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 2;
+}
+.editor-content [data-resize-handle='top-left'] { cursor: nwse-resize; transform: translate(-40%, -40%); }
+.editor-content [data-resize-handle='bottom-right'] { cursor: nwse-resize; transform: translate(40%, 40%); }
+.editor-content [data-resize-handle='top-right'] { cursor: nesw-resize; transform: translate(40%, -40%); }
+.editor-content [data-resize-handle='bottom-left'] { cursor: nesw-resize; transform: translate(-40%, 40%); }
+.editor-content [data-resize-wrapper]:hover [data-resize-handle],
+.editor-content [data-resize-state='true'] [data-resize-handle] {
+  opacity: 1;
+}
+.tiptap:not([contenteditable='true']) [data-resize-handle] {
+  display: none;
+}
+
+.image-upload-placeholder {
+  margin: 12px 0;
+  padding: 28px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  animation: image-upload-pulse 1.2s ease-in-out infinite;
+}
+@keyframes image-upload-pulse {
+  50% { opacity: 0.55; }
+}
+
+/* ---- Attached files (fileAttachment.ts) ---- */
+.editor-content .file-attachment {
+  margin: 0.5rem 0;
+}
+
+.editor-content .file-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 100%;
+  padding: 0.55rem 0.85rem 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.editor-content .file-attachment-link:hover {
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.editor-content .ProseMirror-selectednode .file-attachment-link,
+.editor-content .file-attachment.ProseMirror-selectednode .file-attachment-link {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.editor-content .file-attachment-badge {
+  flex-shrink: 0;
+  min-width: 2.3rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.editor-content .file-attachment-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-content .file-attachment-size {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+

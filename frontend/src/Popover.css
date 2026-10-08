@@ -1,0 +1,12 @@
+/* Shared look for every Popover.tsx instance -- position/size come from
+   the component's own inline style (computed per anchor), everything
+   else (surface, border, shadow) is common chrome. */
+.popover-panel {
+  position: fixed;
+  z-index: 50;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}

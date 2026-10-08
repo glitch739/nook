@@ -1,0 +1,140 @@
+.page-cover-area {
+  position: relative;
+  width: 100%;
+  align-self: stretch;
+}
+
+/* Once a cover is actually set, bleed past .workspace-body's own
+   padding to sit flush against the workspace edges -- wall to wall,
+   like Notion's own cover treatment, not a rounded image floating
+   inside the padded reading column. Only applied once there's an
+   image to show; the "+ Add cover image" button stays a normal,
+   modestly-sized control within the padded column. */
+.page-cover-area.has-cover {
+  width: calc(100% + var(--ws-pad-x) * 2);
+  margin: calc(var(--ws-pad-y) * -1) calc(var(--ws-pad-x) * -1) 0;
+}
+
+.page-cover-imgwrap {
+  position: relative;
+  /* prevents the browser's own image-drag ghost/cursor from fighting
+     with the pointer-drag reposition gesture below */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.page-cover-img {
+  display: block;
+  width: 100%;
+  /* The frame keeps a fixed *shape*, not a fixed height. With a fixed
+     14rem height the frame got thinner as the window got wider (about
+     5:1 on a laptop, 10:1 on a wide monitor), so object-fit: cover
+     showed a much thinner slice of the image on the big screen and the
+     saved position_y landed on a different part of the picture. A
+     fixed aspect ratio shows the same slice everywhere; min/max only
+     keep it sane on phones and ultra-wide screens. */
+  aspect-ratio: 5 / 1;
+  height: auto;
+  min-height: 10rem;
+  max-height: min(22rem, 35vh);
+  object-fit: cover;
+}
+
+/* A faint tint plus the grab cursor is the only visual cue that
+   dragging is live -- kept subtle since the whole point is to still
+   see the image clearly while positioning it. pointer-events: none so
+   the overlay itself never intercepts the drag it's indicating. */
+.page-cover-imgwrap.repositioning {
+  cursor: grab;
+  /* On touch, a drag here moves the image, not the page. */
+  touch-action: none;
+}
+
+.page-cover-imgwrap.repositioning:active {
+  cursor: grabbing;
+}
+
+.page-cover-imgwrap.repositioning::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, black 12%, transparent);
+  pointer-events: none;
+}
+
+.page-cover-actions {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.page-cover-area:hover .page-cover-actions {
+  opacity: 1;
+}
+
+/* Replaces .page-cover-actions while actively repositioning and stays
+   visible the whole time -- hover-only opacity would be awkward
+   mid-drag if the pointer strays off the button area (dragging is
+   tracked via window-level listeners, not just this element, so
+   that's a real possibility). */
+.page-cover-reposition-actions {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.page-cover-btn {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, black 45%, transparent);
+  color: white;
+  font-size: 0.78rem;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(var(--blur));
+  backdrop-filter: blur(var(--blur));
+}
+
+.page-cover-btn:hover {
+  background: color-mix(in srgb, black 60%, transparent);
+}
+
+/* The Save button -- same --accent/--accent-text pairing as
+   .add-property-submit (DatabaseView.css), not a hardcoded color, so
+   it stays readable in both themes instead of repeating that mistake
+   a third time. */
+.page-cover-btn-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.page-cover-btn-primary:hover {
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+/* Always visible when there's no cover yet -- unlike the Replace/
+   Remove actions above (hover-only, since the cover image itself
+   is already visible feedback that the feature exists), an
+   opacity-0-until-hover "add cover" control would have nothing on
+   screen for a hover to ever land on. */
+.page-cover-add {
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.page-cover-add:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}

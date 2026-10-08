@@ -1,0 +1,48 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "emoji:sync": "node scripts/sync-fluent-emoji.mjs"
+  },
+  "dependencies": {
+    "@dragdroptouch/drag-drop-touch": "^2.0.3",
+    "@tiptap/extension-code-block-lowlight": "^3.31.0",
+    "@tiptap/extension-collaboration": "^3.31.0",
+    "@tiptap/extension-collaboration-caret": "^3.31.0",
+    "@tiptap/extension-image": "^3.31.0",
+    "@tiptap/extension-placeholder": "^3.31.0",
+    "@tiptap/extension-table": "^3.31.0",
+    "@tiptap/extension-task-item": "^3.31.0",
+    "@tiptap/extension-task-list": "^3.31.0",
+    "@tiptap/pm": "^3.31.0",
+    "@tiptap/react": "^3.31.0",
+    "@tiptap/starter-kit": "^3.31.0",
+    "@tiptap/suggestion": "^3.31.0",
+    "@tiptap/y-tiptap": "^3.0.9",
+    "lib0": "^0.2.118",
+    "lowlight": "^3.3.0",
+    "lucide-static": "^1.43.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
+  },
+  "devDependencies": {
+    "@lobehub/fluent-emoji-3d": "^1.1.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,13 @@
+.git
+**/node_modules
+frontend/dist
+backend/nook
+backend/nook-*
+backend/uploads
+backend/backups
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/.env
+deploy
+docs

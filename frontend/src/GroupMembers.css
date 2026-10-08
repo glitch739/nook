@@ -1,0 +1,155 @@
+.group-members-popover {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.group-members-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.group-members-error {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.group-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.group-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.group-member-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.group-member-name {
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-username {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-role {
+  flex-shrink: 0;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-family: inherit;
+}
+
+.group-member-remove {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.group-member-remove:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.group-invite-open {
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-invite-open:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.group-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.group-invite-input,
+.group-invite-role {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.group-invite-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.group-invite-submit {
+  flex: 1;
+  padding: 0.35rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.group-invite-cancel {
+  padding: 0.35rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.group-invite-cancel:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}

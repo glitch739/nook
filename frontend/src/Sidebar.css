@@ -1,0 +1,1198 @@
+/* Wraps .sidebar so showing/hiding can slide: the shell's width
+   animates between the sidebar width and 0 while .sidebar keeps its
+   own width inside. The shell is what sticks to the viewport now. Its
+   overflow is clipped only while closed or sliding, so the resize
+   handle (which pokes 3px past the edge) works when settled open. */
+.sidebar-shell {
+  flex-shrink: 0;
+  height: 100vh;
+  /* iPad Safari (desktop layout): 100vh includes the area under the
+     browser's own toolbar; dvh is the visible height. */
+  height: 100dvh;
+  position: sticky;
+  top: 0;
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-shell-clip {
+  overflow: hidden;
+}
+
+/* Dragging the resize handle must follow the pointer, not ease. */
+.sidebar-shell-resizing {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-shell {
+    transition: none;
+  }
+}
+
+.sidebar {
+  /* position: relative is the containing block for the absolutely-
+     positioned resize handle below. Stickiness lives on .sidebar-shell. */
+  flex-shrink: 0;
+  height: 100%;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+}
+
+/* While actively dragging the resize handle, text selection during fast
+   mouse movement looks broken/flickery — suppress it for the duration. */
+/* Only for the instant of the auto-fit measurement (Sidebar.tsx). */
+.sidebar-measuring .sidebar-search-wrap,
+.sidebar-measuring .sidebar-footer {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Animates the double-click auto-fit, in step with .sidebar-shell. */
+.sidebar {
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.resizing {
+  -webkit-user-select: none;
+  user-select: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 5;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar.resizing .sidebar-resize-handle {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.sidebar-workspace {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.workspace-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.workspace-name {
+  flex: 1;
+}
+
+/* -- Search (SidebarSearch.tsx, ADR 0007) -- */
+.sidebar-search-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 0 0.75rem;
+}
+
+.sidebar-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 2.6rem 0.45rem 1.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.sidebar-search::placeholder {
+  color: var(--text-muted);
+}
+
+.sidebar-search:focus {
+  background: var(--surface-solid);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.sidebar-search-glyph {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 0.85rem;
+  height: 0.85rem;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.sidebar-search-kbd,
+.sidebar-search-clear {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.sidebar-search-kbd {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.sidebar-search-clear {
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sidebar-search-clear:hover {
+  background: var(--surface-hover-strong);
+  color: var(--text);
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  transition: opacity 0.15s ease;
+}
+
+/* A request for a newer query is in flight: keep the previous list up
+   (no flicker to empty while typing), just visibly stale. */
+.search-results-pending {
+  opacity: 0.55;
+}
+
+.search-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.search-result-selected {
+  background: var(--surface-hover);
+}
+
+.search-result.active {
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+}
+
+:root[data-theme='dark'] .search-result.active {
+  background: color-mix(in srgb, var(--text) 10%, var(--surface-solid));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.search-result-icon {
+  margin-top: 0.15rem;
+}
+
+.search-result-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.search-result-title,
+.search-result-path {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-result-title {
+  font-weight: 500;
+}
+
+.search-result-path {
+  margin-top: 0.05rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.search-result-snippet {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.search-result mark {
+  background: color-mix(in srgb, var(--icon-yellow) 28%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.search-empty {
+  padding: 1rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* A group/space picked from the search results, briefly highlighted
+   once the tree is back (Sidebar.tsx onRevealSection). */
+.sidebar-flash {
+  animation: sidebar-flash 1.2s ease-out;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes sidebar-flash {
+  0%,
+  30% {
+    background: color-mix(in srgb, var(--icon-yellow) 22%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* Collapsed sections should read as a tight list of headers, not carry
+   the same roomy gap an expanded section needs to separate its page
+   list from the next one -- teamspace-expanded/-collapsed (Sidebar.tsx)
+   pick which. */
+/* -- Groups (migrations/0009_groups.sql), the tier above teamspaces --
+   same collapse/drag-handle/rename patterns as a teamspace itself
+   (.teamspace-grip, .chevron, .teamspace-name-input are all shared,
+   not duplicated), just one visual step further out. */
+
+/* No divider line between groups -- per direct request, a plain gap
+   reads as more minimal than a rule across the whole width here. */
+.sidebar-group {
+  margin-bottom: 0.2rem;
+}
+
+/* Groups sit almost directly under one another (per direct request,
+   2026-09-27) -- the last expanded space in a group no longer adds its
+   own bottom margin on top of the group's small one. Spaces *within*
+   a group keep their spacing. */
+.sidebar-group-body > .teamspace-expanded:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.25rem;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sidebar-group-dragging {
+  opacity: 0.4;
+}
+
+/* Explicit before/after (which half of the section's own bounding box
+   the cursor is over), same reasoning as .page-row-drop-before/-after --
+   an inset top/bottom border reads as "it'll land at this edge" without
+   depending on comparing list positions, which is what let "move this
+   group/space to be last" silently fail to have any drop that meant it. */
+.sidebar-group-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.sidebar-group-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+/* A dragged *space* hovering this group as a valid destination -- a
+   filled tint across the whole section rather than an edge border,
+   deliberately distinct from the before/after group-reorder indicators
+   above (this means "it'll land inside here", not "at this edge").
+   Previously there was no feedback at all for this case, which made a
+   drop that actually worked look and feel exactly like one that didn't. */
+.sidebar-group-drop-space {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+/* Every teamspace nested under a group is indented relative to the
+   group's own name, same reasoning as a page row's own indent under
+   its teamspace (Sidebar.tsx's PageTreeItem) -- without it, a group
+   name and the teamspace names filed under it read at nearly the same
+   distance from the sidebar's edge, not clearly "these belong to that
+   group." */
+.sidebar-group-body > .teamspace {
+  margin-left: 0.5rem;
+}
+
+.teamspace-expanded {
+  margin-bottom: 0.75rem;
+}
+
+.teamspace-collapsed {
+  margin-bottom: 0.1rem;
+}
+
+/* Notion's own sub-sections (a private page's nested page list, e.g.
+   a long group name in the reference screenshot) read as
+   bold, normal-case, near-full-brightness titles -- the same weight as
+   a page row's own title, not a small muted all-caps section label.
+   Previously styled as an uppercase/letter-spaced/muted label; changed
+   to match the Notion reference directly, per explicit request. */
+.teamspace-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+}
+
+/* Drag handle for reordering teamspaces -- same hover-revealed grip
+   pattern as DatabaseView.css's .db-th-grip, so double-click-to-rename
+   and the icon/"+"/delete buttons right next to it keep working
+   normally instead of fighting a drag-start on the whole row. Collapses
+   to zero width at rest (not just opacity: 0) rather than always
+   reserving 1.1rem it usually isn't visibly using -- the teamspace name
+   sits noticeably further left as a result, closer to the sidebar's own
+   edge than a page row starts, which is the whole point of it (a
+   teamspace and the pages under it need to read as clearly different
+   indent levels). */
+.teamspace-grip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  height: 1.1rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition:
+    width 0.1s ease,
+    opacity 0.1s ease,
+    background-color 0.1s ease,
+    color 0.1s ease;
+}
+
+.teamspace-header:hover .teamspace-grip,
+.sidebar-group-header:hover .teamspace-grip {
+  width: 1.1rem;
+  opacity: 1;
+}
+
+.teamspace-grip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.teamspace-grip:active {
+  cursor: grabbing;
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-solid));
+  color: var(--accent);
+}
+
+/* Dims/highlights the *whole* section (header plus its own page tree),
+   not just the header strip -- dragover/drop are wired to the whole
+   .teamspace div now (see Teamspace's own comment on why: the header
+   alone was too thin a target for a section with several pages under
+   it), so the visual feedback covers the same area the drop actually
+   responds to. */
+.teamspace-dragging {
+  opacity: 0.4;
+}
+
+/* Explicit before/after -- see .sidebar-group-drop-before/-after's own
+   comment, one tree level in. */
+.teamspace-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.teamspace-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+.teamspace-header .teamspace-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamspace-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+}
+
+.page-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.page-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  padding-right: 0.35rem;
+  /* --row-indent is set per row from its tree depth (Sidebar.tsx). */
+  padding-left: var(--row-indent, 2.3rem);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.page-row:hover {
+  background: var(--surface-hover);
+}
+
+.page-row.active {
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+  font-weight: 500;
+}
+
+/* Dark mode: the light theme's "white card on the sidebar" look
+   doesn't carry over -- --surface-solid is within a shade of the dark
+   sidebar itself and a black drop shadow is invisible on it, so the
+   open page's row all but vanished. Instead, a clearly lighter raised
+   card: a lifted fill (10%, above hover's 7%, so active never reads as
+   just "hovered"), a faint hairline edge, and a soft top highlight for
+   the same subtle depth the light card gets from its shadow. */
+:root[data-theme='dark'] .page-row.active {
+  background: color-mix(in srgb, var(--text) 10%, var(--surface-solid));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* Hover-revealed, same collapse-to-zero-width mechanism as the grips
+   (.teamspace-grip/.page-grip) -- previously always reserved 1rem, which
+   pushed every row's icon/title that much further right permanently.
+   Per direct request: apply the same "only takes up space on hover"
+   treatment already liked for the drag handle to this icon too. */
+.chevron {
+  width: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: width 0.1s ease, opacity 0.1s ease;
+}
+
+.chevron:hover {
+  color: var(--text);
+}
+
+/* Same 200ms as Collapse.tsx, so the arrow turns while the group
+   opens or closes. */
+.chevron-icon {
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.chevron-icon-open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron-icon {
+    transition: none;
+  }
+}
+
+.page-row:hover .chevron:not(.chevron-hidden),
+.teamspace-header:hover .chevron:not(.chevron-hidden),
+.sidebar-group-header:hover .chevron:not(.chevron-hidden) {
+  width: 1rem;
+  opacity: 1;
+}
+
+.chevron-hidden {
+  visibility: hidden;
+  cursor: default;
+}
+
+.page-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* A page-icon showing a lucide-static icon (PageIcon.tsx) inlines raw
+   <svg> markup instead of text -- size it to the surrounding font-size
+   the same way the emoji case already reads as "one character wide". */
+.page-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.page-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-title-empty {
+  color: var(--text-muted);
+}
+
+/* Drag handle for reordering/moving a page -- same hover-revealed grip
+   pattern as .teamspace-grip, one tree level in. It used to sit in the
+   row's flex flow, permanently reserving 1rem (plus a gap) of width
+   even while invisible; now it's absolutely positioned inside the row's
+   left indent instead (just left of where the chevron/icon start, see
+   --row-indent), so it costs the title no width at all and appearing on
+   hover doesn't shift anything. */
+.page-grip {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--row-indent, 2.3rem) - 1.15rem);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.1s ease, background-color 0.1s ease, color 0.1s ease;
+}
+
+.page-row:hover .page-grip {
+  opacity: 1;
+}
+
+.page-grip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.page-grip:active {
+  cursor: grabbing;
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-solid));
+  color: var(--accent);
+}
+
+.page-row-dragging {
+  opacity: 0.4;
+}
+
+/* Drop-position feedback while dragging a page over another page row --
+   top/bottom inset border for landing exactly before/after that row
+   (mirrors .teamspace-drop-target's own top-edge reasoning), a tinted
+   background for landing *into* it (becoming its child) instead. */
+.page-row-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.page-row-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+.page-row-drop-into {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* The single "⋮" hover-revealed menu button (RowMenu) -- replaces what
+   used to be a separate icon per row action. */
+.row-menu-btn {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.page-row:hover .row-menu-btn,
+.teamspace-header:hover .row-menu-btn,
+.sidebar-group-header:hover .row-menu-btn {
+  opacity: 1;
+}
+
+.row-menu-btn:hover {
+  background: var(--surface-hover-strong);
+  color: var(--text);
+}
+
+.create-menu-item-danger {
+  color: var(--danger);
+}
+
+.create-menu-item-danger:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.move-to-group + .move-to-group {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.move-to-group-name {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.move-to-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.move-to-item:hover {
+  background: var(--surface-hover);
+}
+
+.page-add-child {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+/* Teamspace/group headers' own +/menu used to force opacity: 1
+   unconditionally -- a permanently-visible icon row on every single
+   section read as cluttered/"admin panel"-like. Hover-revealed now,
+   same as a page row's own +/menu already were. */
+.page-row:hover .page-add-child,
+.teamspace-header:hover .page-add-child,
+.sidebar-group-header:hover .page-add-child {
+  opacity: 1;
+}
+
+.page-add-child:hover {
+  background: var(--surface-hover-strong);
+  color: var(--text);
+}
+
+.page-icon-editable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.page-icon-editable:hover {
+  background: var(--surface-hover-strong);
+}
+
+/* A group's icon gets the small rounded-square "badge" Notion gives a
+   teamspace's own icon (a colored square, not a bare glyph) -- pages
+   and spaces keep the plain glyph treatment, this is only for the
+   tier that's the real visual anchor of a sidebar section. */
+.group-icon-badge {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  background: var(--surface-hover-strong);
+  padding: 0;
+}
+
+.group-icon-badge .page-icon {
+  font-size: 1rem;
+}
+
+/* A colored lucide icon ("lucide:<name>:<color>", see pageIcon.ts)
+   tints the badge behind it with a faint mix of the same color, the
+   way Notion does -- Sidebar.tsx mirrors the icon's data-icon-color
+   onto the badge so this can read --icon-color. Emoji and uncolored
+   icons keep the neutral gray badge above. */
+.group-icon-badge[data-icon-color] {
+  background: color-mix(in srgb, var(--icon-color) var(--icon-tint-strength), transparent);
+}
+
+.group-icon-badge[data-icon-color]:hover {
+  background: color-mix(in srgb, var(--icon-color) calc(var(--icon-tint-strength) + 10%), transparent);
+}
+
+.page-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+}
+
+/* "Teamspaces"-style section label above the group list -- Notion's
+   own equivalent is small, muted, uppercase-ish; unlike an individual
+   group/space's own name (full-brightness, normal case, see
+   .sidebar-group-name/.teamspace-header's own comments), a *category*
+   label like this one is exactly where that treatment still belongs. */
+.sidebar-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.5rem 0.3rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.sidebar-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.sidebar-section-label .page-add-child {
+  opacity: 0;
+}
+
+/* A touch bigger than the "+" next to it: the double chevron is
+   hard to make out at 14px. */
+.sidebar-section-label .sidebar-collapse-all {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.sidebar-section-label:hover .page-add-child {
+  opacity: 1;
+}
+
+.new-space-form {
+  margin: 0.25rem 0.1rem;
+}
+
+/* CreatePageButton's popover -- pick document vs. database. */
+.create-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem;
+}
+
+.create-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.create-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+.new-space-input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+/* IconPicker.tsx -- replaces the old plain-text icon-editor popover.
+   position: fixed + portaled into document.body (top/left set inline
+   from anchorEl's own bounding rect) so the sidebar's own
+   overflow-y: auto never clips it -- see IconPicker.tsx's header
+   comment. */
+/* Base position/surface/shadow come from .popover-panel (Popover.css) --
+   this just adds the icon picker's own internal layout. */
+.icon-picker {
+  display: flex;
+  flex-direction: column;
+}
+
+.icon-picker-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.5rem 0;
+}
+
+.icon-picker-tab {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.icon-picker-tab:hover {
+  background: var(--surface-hover);
+}
+
+.icon-picker-tab.active {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.icon-picker-remove {
+  margin-left: auto;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.icon-picker-remove:hover {
+  color: var(--danger);
+}
+
+.icon-picker-search {
+  margin: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-hover);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.icon-picker-body {
+  overflow-y: auto;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.icon-picker-section {
+  margin-bottom: 0.5rem;
+}
+
+.icon-picker-section-label {
+  padding: 0.2rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.icon-picker-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.1rem;
+}
+
+.icon-picker-emoji {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.icon-picker-emoji:hover {
+  background: var(--surface-hover);
+}
+
+.icon-picker-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.1rem;
+}
+
+.icon-picker-icon-btn {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-picker-icon-btn:hover,
+.icon-picker-icon-btn.highlighted {
+  background: var(--surface-hover);
+}
+
+.icon-picker-icon-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  /* lucide-static SVGs stroke="currentColor" by default, but as <img>
+     content they can't inherit page CSS at all -- this filter-based
+     invert is what keeps them visible against the picker's own surface
+     in dark mode instead of rendering as barely-visible near-black
+     strokes. Only search results outside the curated default set still
+     render as <img> at all -- see .icon-picker-icon-svg below for the
+     baked-in default set, which doesn't need this workaround. */
+  filter: none;
+}
+
+:root[data-theme='dark'] .icon-picker-icon-btn img {
+  filter: invert(1);
+}
+
+/* The curated default set (defaultIconSvgs.generated.ts) is inlined as
+   real <svg> markup, not <img> -- it keeps stroke="currentColor"
+   working properly (unlike the <img> case above), so it just needs
+   sizing, no dark-mode filter workaround. */
+.icon-picker-icon-svg {
+  display: flex;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.icon-picker-icon-svg svg {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-picker-empty {
+  grid-column: 1 / -1;
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.icon-picker-hint {
+  padding: 0.5rem 0.2rem 0.2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Notion-style color palette for one icon, opened by hovering it in
+   the picker's Icons tab (IconPicker.tsx's ColorMenu) -- the same icon
+   in each of pageIcon.ts's ICON_COLORS, five per row. Positioned in the
+   picker panel's own coordinates, which is why it's absolute here. */
+.icon-color-menu {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-md);
+}
+
+.icon-color-menu-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-color-menu-btn:hover,
+.icon-color-menu-btn.active {
+  background: var(--surface-hover-strong);
+}
+
+.icon-color-menu-btn .icon-picker-icon-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* A row's hover-revealed "+" and "⋮" buttons used to only fade in via
+   opacity, so at rest they still reserved their full width at the end
+   of every page row and space/group header -- invisible, but the title
+   truncated with an ellipsis ~45px early. Now they collapse to zero
+   width at rest and expand on hover (same mechanism as .chevron and
+   .teamspace-grip), and stay expanded while their own menu is open
+   (.open, set by CreatePageButton/RowMenu) so the menu's anchor doesn't
+   collapse out from under it. */
+.page-row .page-add-child,
+.page-row .row-menu-btn,
+.teamspace-header .page-add-child,
+.teamspace-header .row-menu-btn,
+.sidebar-group-header .page-add-child,
+.sidebar-group-header .row-menu-btn {
+  width: 0;
+  /* The browser's default button padding (6px a side) would otherwise
+     keep a "zero-width" button 12px wide. */
+  padding: 0;
+  overflow: hidden;
+  transition:
+    width 0.1s ease,
+    opacity 0.1s ease;
+}
+
+.page-row:hover .page-add-child,
+.page-row:hover .row-menu-btn,
+.teamspace-header:hover .page-add-child,
+.teamspace-header:hover .row-menu-btn,
+.sidebar-group-header:hover .page-add-child,
+.sidebar-group-header:hover .row-menu-btn,
+.page-add-child.open,
+.row-menu-btn.open {
+  width: 1.25rem;
+  opacity: 1;
+}
+
+/* Bottom of the sidebar: entry to the archive. margin-top: auto pins it
+   to the bottom when the tree is short; with a long tree it simply
+   follows it (the sidebar scrolls). */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-footer-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+

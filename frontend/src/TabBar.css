@@ -1,0 +1,218 @@
+.tab-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+}
+
+.tab-bar-toggle {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tab-bar-toggle-divider {
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-bar-toggle-divider-open {
+  transform: translateX(8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-bar-toggle-divider {
+    transition: none;
+  }
+}
+
+.tab-bar-toggle:hover {
+  background: var(--surface-solid);
+  color: var(--text);
+}
+
+.tab-bar-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow-x: auto;
+}
+
+.tab {
+  flex-shrink: 0;
+  max-width: 12rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.825rem;
+  color: var(--text-muted);
+}
+
+.tab:hover {
+  background: var(--surface-solid);
+}
+
+.tab.active {
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+}
+
+/* Same treatment as DatabaseView.css's db-th-dragging/db-th-drop-target
+   -- dim the tab being dragged, and mark whichever tab a drag is
+   currently over with an accent edge showing where it'll land (always
+   "before this tab", see App.tsx's reorderTabs). */
+.tab-dragging {
+  opacity: 0.4;
+}
+
+.tab-drop-target {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.tab-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* A tab-icon showing a lucide-static icon (PageIcon.tsx) inlines raw
+   <svg> markup instead of text -- see the matching rule in Sidebar.css. */
+.tab-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.tab-bar-user {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-left: 0.5rem;
+  font-size: 0.825rem;
+  color: var(--text);
+}
+
+.tab-bar-user button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.tab-bar-user button:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-bar-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Lives inline in the tab bar now, rightmost of the right-hand cluster
+   (user label + logout to its left) -- not a page-level fixed-position
+   button anymore. */
+.tab-bar-right .theme-toggle {
+  position: static;
+  width: 2.1rem;
+  height: 2.1rem;
+  font-size: 1rem;
+}
+
+.tab-bar-user button.tab-bar-user-name {
+  border-color: transparent;
+  background: none;
+  font-weight: 500;
+}
+
+.tab-bar-user button.tab-bar-user-name:hover {
+  background: var(--surface-hover);
+  box-shadow: none;
+}
+
+/* Admins: sign-ups awaiting approval. An accent pill next to the name
+   (desktop), a dot on the account button plus a menu entry (phone). */
+.tab-bar-user button.pending-badge {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.tab-bar-account {
+  position: relative;
+}
+
+.pending-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface-2);
+}
+
+.pending-menu-item {
+  color: var(--accent);
+  font-weight: 600;
+}
+

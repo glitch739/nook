@@ -1,0 +1,651 @@
+/* Database pages (ADR 0004) get the full workspace width, not the
+   centered reading column document pages use -- a table needs the
+   room. */
+.database-view {
+  width: 100%;
+  align-self: stretch;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  /* A lighter cell-border color than the app-wide --border -- the full
+     -strength value (also used for input/panel borders everywhere else)
+     read as too heavy once it was outlining every cell in a grid rather
+     than just a handful of boxes. Scoped here rather than touching
+     --border itself, which plenty of other, unrelated things rely on. */
+  --db-border: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.database-table-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  /* Room so the scrollbar (once it appears) doesn't sit flush against
+     "+ New row" right below it. */
+  padding-bottom: 0.4rem;
+  /* Every OS/browser's default thin-scrollbar behavior already makes
+     this appear when the table overflows -- but on systems that hide
+     scrollbars until hover (macOS trackpad-style, most of Chromium),
+     "there's more to the right" isn't discoverable at a glance. A
+     small always-legible custom scrollbar instead of relying on that. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+.database-table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.database-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.database-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.database-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.database-table {
+  /* width: max-content, not auto -- this is the part last round's fix
+     got wrong. Per the fixed-table-layout algorithm, an *auto* table
+     width doesn't mean "size to my columns"; the spec has it fall back
+     to the table's *containing block* width whenever that's wider than
+     the columns' own sum, which .database-table-wrap (a flex: 1 item,
+     stretched to fill the row) always is. So dropping width: 100%
+     changed nothing -- auto was quietly resolving to the exact same
+     stretched width anyway, still redistributing every resize across
+     every column instead of just the one being dragged. max-content is
+     an explicit "size to your content's own preferred width" request,
+     which for a fixed-layout table *is* the colgroup widths' sum --
+     the only value that actually makes one column's resize affect only
+     that column, and lets the table genuinely exceed
+     .database-table-wrap's width so its overflow-x scrollbar has
+     something to trigger on. */
+  width: max-content;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  /* Column widths come from an explicit <colgroup> (DatabaseView.tsx),
+     one <col> per column -- table-layout: fixed is what makes the
+     browser actually honor those widths instead of treating them as a
+     mere hint that content can still force wider under the default
+     auto layout, which is what manual resizing needs to stick. */
+  table-layout: fixed;
+}
+
+.db-th {
+  position: relative;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--db-border);
+  /* Vertical dividers between columns -- now that widths are
+     user-resizable, columns with narrow content otherwise left loose,
+     un-bounded gaps instead of reading as a coherent grid, closer to
+     Excel/Sheets than the row-lines-only look before. border-collapse
+     on .database-table merges this with the next cell's own border, no
+     doubled-up line. */
+  border-right: 1px solid var(--db-border);
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.1s ease;
+}
+
+/* Hovering anywhere in a column's header signals "this is a movable
+   column," not just the grip icon appearing inside it -- reinforces
+   the affordance instead of relying on one small glyph to carry it. */
+.db-th:hover {
+  background: var(--surface-hover);
+}
+
+/* .db-th itself stays a plain table-cell -- see the inline comment in
+   DatabaseView.tsx on why the flex layout lives here instead. */
+.db-th-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  /* Lets .db-th-btn/.db-th-label actually shrink and ellipsize instead
+     of forcing the row wider -- a flex item's default min-width is
+     auto (= its content's width), not 0. */
+  min-width: 0;
+}
+
+.db-th-grip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.1s ease, background-color 0.1s ease, color 0.1s ease;
+}
+
+.db-th:hover .db-th-grip {
+  opacity: 1;
+}
+
+/* The grip gets its own hover highlight once it's visible, same as
+   every other small icon-button in this file -- distinguishes "I'm
+   about to grab the drag handle specifically" from just hovering the
+   header generally. */
+.db-th-grip:hover {
+  background: var(--surface-hover-strong);
+  color: var(--text);
+}
+
+.db-th-grip:active {
+  cursor: grabbing;
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-solid));
+  color: var(--accent);
+}
+
+/* The column-width resize handle -- a thin strip at the header's right
+   edge, kept inside .db-th's own box (not overflowing past it) since
+   .db-th clips its content now (overflow: hidden, for the ellipsized
+   header label). A separate element from the grip: dragging this
+   resizes the column via Pointer Events, dragging the grip reorders it
+   via HTML5 drag-and-drop -- two different gestures, so two different
+   drag sources. */
+.db-th-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 1;
+  touch-action: none;
+}
+
+.db-th-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  right: 2px;
+  width: 3px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.db-th-resize-handle:hover::after,
+.db-th-resize-handle-active::after {
+  background: var(--accent);
+}
+
+/* The dragged column, header *and* every one of its body cells (see
+   the matching db-td-dragging/-drop-target classes applied in the
+   tbody loop) -- dimmed with a dashed outline so it reads as "lifted
+   out," not just "slightly faded," for the column's entire vertical
+   strip, not only its header. */
+.db-th-dragging,
+.db-td-dragging {
+  opacity: 0.35;
+  outline: 1px dashed var(--border);
+  outline-offset: -1px;
+}
+
+/* Whichever column a drag is currently hovering over as a drop target
+   -- a solid accent bar down the column's left edge, header through
+   every body cell, shows exactly where the dragged column would land
+   (always "before this column", see handleColumnDrop in
+   DatabaseView.tsx). Thicker than a hairline and paired with a tinted
+   background so it reads clearly even at a glance, not just up close. */
+.db-th-drop-target,
+.db-td-drop-target {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+
+/* .db-th-title/.db-th-add no longer set their own width -- every
+   column's width, including the add-column button's, comes from the
+   <colgroup> in DatabaseView.tsx now (see the resize handle below). */
+
+.db-th-btn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* <button> is center-aligned by default in every browser's UA
+     stylesheet -- invisible back when this only ever sized to fit its
+     own text exactly, but flex: 1 above now stretches it to fill the
+     whole (resizable) header width, which made that default alignment
+     suddenly visible as "some headers look centered." Every column
+     header, property or title, reads left-aligned uniformly now. */
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.db-th-btn:hover {
+  background: var(--surface-hover);
+}
+
+/* The title column's header reuses .db-th-btn's padding/font for
+   visual consistency with the real columns, but it's a plain <span>,
+   not a button -- "Name" isn't renamable, so no pointer cursor or hover
+   highlight implying it's clickable. */
+.db-th-label {
+  display: inline-block;
+  cursor: default;
+}
+
+.db-th-label:hover {
+  background: transparent;
+}
+
+.db-th-input {
+  width: 100%;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.db-add-column-btn {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.db-add-column-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.db-tr:hover {
+  background: var(--surface-hover);
+}
+
+.db-td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--db-border);
+  border-right: 1px solid var(--db-border);
+  vertical-align: middle;
+}
+
+.db-th-add,
+.db-td-add {
+  border-right: none;
+}
+
+/* .db-td-title stays a plain table-cell (its default display) -- the
+   flex layout lives on an inner wrapper div instead of the <td> itself.
+   A <td> with display: flex directly on it stops participating in the
+   table's own row-height/cell-box algorithm the same way its sibling
+   <td>s do (they're still plain table-cells), which is exactly what
+   produced the visible row misalignment reported against the previous
+   version of this file. */
+.db-td-title-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Icon-only now -- opens the row detail panel, same as clicking the
+   title text does. The title text used to be *inside* this button too,
+   but a double-click-to-rename input can't live inside a <button>
+   (invalid nesting), so it's a separate sibling below instead, same
+   split TitleCell itself uses. */
+.db-row-title-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.db-row-title-btn:hover {
+  background: var(--surface-hover-strong);
+}
+
+.db-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.2rem 0.3rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.db-row-title:hover {
+  background: var(--surface-hover-strong);
+}
+
+.db-row-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+}
+
+.db-row-delete {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.db-tr:hover .db-row-delete {
+  opacity: 1;
+}
+
+.db-row-delete:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.db-add-row-btn {
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.db-add-row-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Cell editors, select pills/popover and the property list moved to
+   PropertyCell.css: they are also used outside this lazy-loaded view
+   (RowPropertiesBar on a row opened as its own page). */
+
+/* -- Add-column menu -- */
+
+.add-property-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  gap: 0.4rem;
+}
+
+.add-property-input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+}
+
+.add-property-types {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.add-property-type {
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.add-property-type:hover {
+  background: var(--surface-hover);
+}
+
+.add-property-type.active {
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 15%, transparent));
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.add-property-submit {
+  padding: 0.35rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  /* --accent flips between a dark button (light theme) and a pale one
+     (dark theme, see index.css) -- a hardcoded white text color read
+     fine in light mode and was unreadable (white-on-near-white) in
+     dark mode. --accent-text is the token already paired with --accent
+     for exactly this. */
+  color: var(--accent-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* -- Column header menu -- */
+
+.column-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem;
+}
+
+.column-menu-item {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.column-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+.column-menu-danger:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+/* -- Row detail panel --
+   Portaled to document.body (see RowDetailPanel.tsx) and positioned
+   fixed against the viewport, not the table's own flex row -- it used
+   to be a flex sibling of .database-table-wrap, which meant opening a
+   row squeezed the whole table narrower to make room for it. A side
+   peek like Notion's own should float *over* everything (table, tab
+   bar, sidebar) instead, leaving the table at full width underneath. */
+
+.row-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  /* Actual width is an inline style driven by RowDetailPanel.tsx's own
+     panelWidth state (draggable via .row-detail-resize-handle below) --
+     max-width here is just a CSS-level backstop matching the JS clamp
+     (MAX_PANEL_WIDTH_RATIO), in case the window shrinks after a resize
+     without another drag to re-clamp it. */
+  max-width: 50vw;
+  background: var(--surface-solid);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  padding: 1rem 1.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+/* Mirrors .db-th-resize-handle -- same idea (a thin hover/active strip
+   over a shared edge), rotated to the panel's left border instead of a
+   column's right one. */
+.row-detail-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  z-index: 1;
+  touch-action: none;
+}
+
+.row-detail-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 3px;
+  background: transparent;
+}
+
+.row-detail-resize-handle:hover::after {
+  background: var(--accent);
+}
+
+/* Slides in from the right with a light fade, and back out on close
+   (DatabaseView keeps it mounted until the exit ends, via usePresence;
+   ROW_PANEL_EXIT_MS there matches the exit duration here). */
+@media (prefers-reduced-motion: no-preference) {
+  .row-detail-panel {
+    animation: row-detail-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .row-detail-panel-closing {
+    animation: row-detail-slide-out 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+    pointer-events: none;
+  }
+}
+
+@keyframes row-detail-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes row-detail-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0.4;
+  }
+}
+
+/* Top bar of the row peek: "open as full page" on the left, close on
+   the right. */
+.row-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.row-detail-open-full {
+  width: 1.8rem;
+  height: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.row-detail-open-full:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.row-detail-close {
+  width: 1.8rem;
+  height: 1.8rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.row-detail-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.row-detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-detail-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding: 0.15rem 0.2rem;
+}
+
+.row-detail-title-input:focus {
+  outline: none;
+  background: var(--surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+.row-detail-body {
+  flex: 1;
+  min-height: 10rem;
+}

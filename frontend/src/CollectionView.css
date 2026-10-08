@@ -1,0 +1,188 @@
+.collection-view {
+  width: 100%;
+  max-width: var(--content-max-width);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.collection-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.25rem 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.collection-title-icon {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.collection-title-icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+.collection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.collection-filter {
+  flex: 1 1 14rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text-muted);
+}
+
+.collection-filter input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.collection-sort {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.collection-new {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collection-new:hover {
+  opacity: 0.9;
+}
+
+.collection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.collection-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.collection-item:hover {
+  background: var(--surface-hover);
+}
+
+.collection-item-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.collection-item-icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+.collection-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.collection-item-date {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The last editor's initials, in a small circle (name on hover). */
+.collection-item-who {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.collection-item-who:empty {
+  visibility: hidden;
+}
+
+.collection-empty {
+  margin: 1rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Phones: the date drops to a second line under the title. */
+@media (max-width: 768px) {
+  .collection-title {
+    font-size: 1.6rem;
+  }
+
+  .collection-item {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+
+  .collection-item-title {
+    flex-basis: calc(100% - 4.5rem);
+  }
+
+  .collection-item-date {
+    order: 3;
+    flex-basis: 100%;
+    padding-left: 1.75rem;
+    font-size: 0.78rem;
+  }
+}

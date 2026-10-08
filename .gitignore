@@ -1,0 +1,26 @@
+# Go
+/backend/nook
+/backend/nook-*
+*.db
+*.db-shm
+*.db-wal
+
+# Uploaded page cover images (internal/assets, NOOK_UPLOADS_DIR) --
+# real user-uploaded files, not repo content.
+/backend/uploads/
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+
+# Embedded frontend build (internal/webui) -- `make embed`/`make build`
+# copies frontend/dist/ here for go:embed to pick up. index.html stays
+# tracked as a placeholder ("frontend not built yet") so a fresh clone
+# can `go build` before ever running the frontend build; real builds
+# overwrite it, which is expected -- see backend/internal/webui/webui.go.
+/backend/internal/webui/dist/*
+!/backend/internal/webui/dist/index.html
+
+# Editor / OS
+.DS_Store
+*.swp

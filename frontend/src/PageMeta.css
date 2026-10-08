@@ -1,0 +1,48 @@
+.page-meta {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-bottom: -0.5rem;
+}
+
+.page-meta-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  margin-left: -0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.page-meta-line:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.page-meta-chevron {
+  font-size: 0.7rem;
+}
+
+.page-activity {
+  margin: 0.4rem 0 0;
+  padding: 0.6rem 0.9rem;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  font-size: 0.82rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.page-activity li {
+  padding: 0.2rem 0;
+}
+
+.page-activity .hint {
+  font-size: 0.78rem;
+}

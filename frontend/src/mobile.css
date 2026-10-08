@@ -1,0 +1,455 @@
+/* Phone/tablet adaptations, all in one place.
+
+   Every selector here is prefixed with `:root` on purpose: the editor
+   and database view are lazy-loaded chunks, so their stylesheets are
+   injected *after* this one, and an equal-specificity rule here would
+   lose to them by source order. The extra `:root` makes these win
+   regardless of load order, without !important everywhere.
+
+   Three independent conditions:
+   - (max-width: 768px)  narrow screen: sidebar becomes a drawer,
+     tighter spacing, full-width panels. Keep in sync with
+     useIsMobile.ts's MOBILE_QUERY.
+   - (hover: none)       no hover available (touch): controls that are
+     normally revealed on hover are always shown.
+   - (pointer: coarse)   finger-sized input: bigger tap targets, and
+     form fields at 16px so iOS Safari doesn't zoom in on focus. */
+
+:root {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* No double-tap-to-zoom delay; a double tap can then act as the
+     app's own double-click (rename). Pinch zoom still works. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 768px) {
+  /* The workspace becomes the scroll container (instead of the whole
+     document), so the tab bar stays put at the top. dvh, not vh: on
+     iOS Safari 100vh is taller than the visible area whenever the
+     browser's own bars are showing. */
+  :root .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :root .workspace {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* Newer iOS Safari tints its own top bar from fixed/sticky elements
+     at the top of the page. On phones the page itself doesn't scroll,
+     so the only one there was body::before (the aurora: a huge, heavily
+     blurred layer), which Safari turned into a hazy band behind the
+     clock. The aurora is hidden behind opaque surfaces on phones
+     anyway, so: drop it, make the page background the header color,
+     and make the header itself the sticky element Safari samples. */
+  :root body::before {
+    display: none;
+  }
+
+  :root body {
+    background: var(--surface-solid);
+  }
+
+  :root .workspace-body {
+    --ws-pad-x: 1rem;
+    --ws-pad-y: 1rem;
+    min-height: 0;
+    gap: 0.9rem;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Sidebar: an overlay drawer over the page. z-index stays below
+     Popover.css's 50 so the sidebar's own menus still open above it. */
+  :root .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 45;
+    width: min(86vw, 22rem) !important; /* beats the inline resize width */
+    height: 100dvh;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    background: var(--surface-solid);
+    box-shadow: var(--shadow-md);
+    overscroll-behavior: contain;
+  }
+
+  :root[data-theme='dark'] .sidebar {
+    background: color-mix(in srgb, var(--text) 4%, var(--surface-solid));
+  }
+
+  :root .sidebar-resize-handle {
+    display: none;
+  }
+
+  /* The drawer is position: fixed, so the desktop slide shell
+     (Sidebar.css) must not take up layout space here. */
+  :root .sidebar-shell {
+    display: contents;
+  }
+
+  :root .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  /* Tab bar: tighter, and the right-hand cluster is a single account
+     button (TabBar.tsx's compact mode). */
+  :root .tab-bar {
+    flex-shrink: 0;
+    gap: 0.35rem;
+    padding: 0.45rem 0.6rem;
+    /* Opaque on phones: the desktop glass (translucent + blur over the
+       aurora blobs) reads as a hazy, tinted band at the top of a small
+       screen. theme.ts sets the browser's own top bar (theme-color) to
+       this same color. */
+    background: var(--surface-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  :root .tab-bar-tabs {
+    scrollbar-width: none;
+  }
+
+  :root .tab-bar-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root .tab {
+    max-width: 9rem;
+  }
+
+  /* Editor: no side padding of its own (the workspace already pads),
+     and the toolbar is one horizontally scrollable line rather than
+     wrapping into three rows. */
+  :root .editor-content {
+    padding: 0.75rem 0 4rem;
+  }
+
+  :root .toolbar {
+    /* Sticky offsets are measured from inside the scroll container's
+       padding, so 0 would leave a gap of --ws-pad-y above the toolbar
+       with text scrolling through it. */
+    top: calc(-1 * var(--ws-pad-y, 1rem));
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.45rem 0;
+    scrollbar-width: none;
+  }
+
+  :root .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root .toolbar-btn {
+    flex-shrink: 0;
+  }
+
+  :root .editor-content h1 {
+    font-size: 1.6rem;
+  }
+
+  /* Database row peek: the whole screen, not a half-width side panel. */
+  :root .row-detail-panel {
+    width: 100vw !important; /* beats the inline resize width */
+    max-width: none;
+    border-left: none;
+    padding: 0.75rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  :root .row-detail-resize-handle {
+    display: none;
+  }
+
+  :root .database-view {
+    gap: 0.75rem;
+  }
+
+  /* Dialogs use the full screen width. */
+  :root .modal-backdrop {
+    padding: 0.5rem;
+  }
+
+  :root .settings-modal {
+    height: calc(100dvh - 1rem);
+  }
+
+  :root .card {
+    width: min(21rem, calc(100vw - 2rem));
+    padding: 1.5rem;
+  }
+
+  :root .table-menu {
+    max-width: calc(100vw - 12px);
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  :root .sidebar {
+    animation: sidebar-drawer-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  :root .sidebar-backdrop {
+    animation: sidebar-backdrop-in 0.2s ease both;
+  }
+
+  /* Closing: slide back out before Sidebar.tsx unmounts it. */
+  :root .sidebar-shell-closing .sidebar {
+    animation: sidebar-drawer-out 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+}
+
+@keyframes sidebar-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes sidebar-drawer-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes sidebar-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The account button + its menu (TabBar.tsx compact mode). */
+:root .tab-bar-account {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+:root .tab-bar-account-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem;
+}
+
+:root .tab-bar-account-name {
+  padding: 0.4rem 0.6rem 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Touch: nothing can be hovered ---------- */
+
+@media (hover: none) {
+  /* Long-press starts a drag here (main.tsx), so iOS's own long-press
+     callout and text selection must stay out of the way. */
+  :root [draggable='true'] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Touch drag (touchDrag.ts): the picked-up item, drawn under the
+     finger. Copied with its computed style by the drag polyfill. */
+  :root .touch-drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    background: var(--surface-solid);
+    border-radius: var(--radius-sm);
+    box-shadow:
+      0 12px 28px rgba(0, 0, 0, 0.28),
+      0 0 0 1px var(--border);
+    transform: scale(1.04);
+    opacity: 0.96;
+  }
+
+  /* Where it will land: thicker lines and a tint, easy to see under a
+     finger (the desktop 2px hairlines are for a mouse pointer). */
+  :root .page-row-drop-before,
+  :root .teamspace-drop-before,
+  :root .sidebar-group-drop-before {
+    box-shadow: inset 0 4px 0 0 var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  :root .page-row-drop-after,
+  :root .teamspace-drop-after,
+  :root .sidebar-group-drop-after {
+    box-shadow: inset 0 -4px 0 0 var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  :root .page-row-drop-into {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  :root .tab-drop-target {
+    box-shadow: inset 4px 0 0 0 var(--accent);
+  }
+
+  /* Nothing selects or calls out while something is being dragged. */
+  :root body.touch-dragging {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Database column grips are hover-revealed; on touch they're the
+     only way to drag a column (long-press the grip). */
+  :root .db-th-grip {
+    opacity: 1;
+  }
+
+  /* Sidebar rows: the "+" and "..." buttons are always there. */
+  :root .page-row .page-add-child,
+  :root .page-row .row-menu-btn,
+  :root .teamspace-header .page-add-child,
+  :root .teamspace-header .row-menu-btn,
+  :root .sidebar-group-header .page-add-child,
+  :root .sidebar-group-header .row-menu-btn,
+  :root .sidebar-section-label .page-add-child {
+    width: 1.75rem;
+    height: 1.75rem;
+    opacity: 1;
+  }
+
+  /* Expand/collapse arrows too. */
+  :root .chevron {
+    width: 1rem;
+    opacity: 1;
+  }
+
+  :root .tab-close,
+  :root .db-row-delete,
+  :root .select-option-edit,
+  :root .select-option-remove,
+  :root .page-cover-actions {
+    opacity: 1;
+  }
+
+  /* A keyboard shortcut hint is noise without a keyboard. */
+  :root .sidebar-search-kbd {
+    display: none;
+  }
+}
+
+/* ---------- Finger-sized targets ---------- */
+
+@media (pointer: coarse) {
+  /* To-do checkboxes: a finger-sized box, plus a wider tap area
+     around it (the label), so ticking one is easy. */
+  :root .editor-content ul[data-type='taskList'] li > label {
+    padding: 0 0.35rem 0 0.1rem;
+    margin-left: -0.1rem;
+  }
+
+  :root .editor-content ul[data-type='taskList'] li > label input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* iOS Safari zooms the page when a focused field's text is smaller
+     than 16px. The one field that is deliberately larger keeps its size. */
+  :root input:not([type='checkbox']):not([type='color']):not(.row-detail-title-input),
+  :root textarea,
+  :root select {
+    font-size: 16px;
+  }
+
+  :root .page-row {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    font-size: 0.9rem;
+  }
+
+  :root .teamspace-header,
+  :root .sidebar-group-header {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    font-size: 0.9rem;
+  }
+
+  :root .create-menu-item,
+  :root .move-to-item,
+  :root .slash-menu-item,
+  :root .search-result {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+
+  :root .tab {
+    padding: 0.5rem 0.6rem;
+  }
+
+  :root .tab-close {
+    width: 1.4rem;
+    height: 1.4rem;
+  }
+
+  :root .tab-bar-toggle {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  :root .toolbar-btn,
+  :root .table-menu-btn {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  :root .select-option-label {
+    padding: 0.5rem 0.4rem;
+  }
+
+  :root .select-option-swatch {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  :root .select-color-picker {
+    grid-template-columns: repeat(6, 1.6rem);
+  }
+
+  :root .select-color-choice,
+  :root .select-color-custom {
+    width: 1.6rem;
+    height: 1.6rem;
+  }
+
+  :root .select-option-edit,
+  :root .select-option-remove,
+  :root .db-row-delete,
+  :root .row-detail-close,
+  :root .row-detail-open-full {
+    width: 2rem;
+    height: 2rem;
+  }
+}

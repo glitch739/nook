@@ -1,0 +1,61 @@
+# Nook, run from the image built in the source repo (make image).
+# Copy this file, .env.example (as .env) and backup.sh into the run
+# folder (~/applications/nook), then: docker compose up -d
+# Full guide: docs/DEPLOY.md
+name: nook
+
+services:
+  nook:
+    image: nook:latest
+    restart: unless-stopped
+    # Run as the host user that owns ./data, so the database, uploads
+    # and backups stay readable (and copyable) from the host.
+    user: "${NOOK_UID:-1000}:${NOOK_GID:-1000}"
+    env_file: .env
+    environment:
+      # Fixed inside the container; not meant to be changed in .env.
+      NOOK_ADDR: ":8080"
+      NOOK_DB_PATH: /data/nook.db
+      NOOK_UPLOADS_DIR: /data/uploads
+      # Only the tunnel container below may set X-Forwarded-For, so logs,
+      # rate limits and account lockouts see real client IPs.
+      NOOK_TRUSTED_PROXIES: 172.31.80.10
+    volumes:
+      - ./data:/data
+    ports:
+      # LAN access: "8080" (all interfaces). Once the tunnel is the way
+      # in, set NOOK_PUBLISH=127.0.0.1:8080 in .env so only this machine
+      # can reach Nook directly. Note: Docker-published ports bypass ufw.
+      - "${NOOK_PUBLISH:-8080}:8080"
+    # Container hardening: read-only filesystem except /data and /tmp,
+    # no Linux capabilities, no privilege escalation.
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      nook:
+        ipv4_address: 172.31.80.20
+
+  # Cloudflare Tunnel (ADR 0008). Off until a tunnel token is in .env:
+  #   docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [nook]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      nook:
+        ipv4_address: 172.31.80.10
+
+networks:
+  nook:
+    ipam:
+      config:
+        - subnet: 172.31.80.0/24

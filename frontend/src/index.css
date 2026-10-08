@@ -1,0 +1,309 @@
+/* Design language: Apple-style — rounded corners, glass/translucent
+   surfaces over a soft blurred "aurora" gradient background, tactile
+   press/hover motion. Reference points: macOS/iOS system chrome, ARC
+   Browser, Notion. This file owns the tokens every component pulls
+   from; extend these rather than hardcoding new values per component. */
+:root {
+  --bg: #f5f5f7;
+  --blob-1: rgba(120, 150, 255, 0.35);
+  --blob-2: rgba(255, 140, 200, 0.3);
+  --blob-3: rgba(140, 255, 210, 0.25);
+
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-2: rgba(255, 255, 255, 0.5);
+  --surface-solid: #ffffff;
+  /* A hover/press tint guaranteed visible over a *solid* surface --
+     --surface itself is translucent white, meant to layer over the
+     blurred aurora background (sidebar, popovers): visible there, but
+     mathematically identical to --surface-solid wherever a container's
+     own background already IS --surface-solid (every workspace-body
+     control: DatabaseView, PageCover, row-detail panel, ...) --
+     translucent white over solid white composites to solid white,
+     zero visible difference, in light mode specifically (dark mode's
+     --surface happens to differ slightly from --surface-solid, so it
+     reads as "barely working" there and not at all here -- not a
+     deliberate design, just white-on-white being exactly invisible).
+     Mixing in a little of --text instead is guaranteed nonzero in
+     both themes. Use this, not --surface, for hover/press backgrounds
+     anywhere the resting background is already --surface-solid. */
+  --surface-hover: color-mix(in srgb, var(--text) 7%, var(--surface-solid));
+  /* A stronger version of --surface-hover, for a small control (grip,
+     icon button, row title) whose own hover fires only while its
+     already-hover-tinted parent (a --surface-hover row/header) is also
+     hovered -- --surface-hover itself would be indistinguishable from,
+     or even a step BACK from, that surrounding tint. Double the mix so
+     the specific target still reads as "more hovered" than its
+     container. */
+  --surface-hover-strong: color-mix(in srgb, var(--text) 14%, var(--surface-solid));
+  --text: #1d1d1f;
+  --text-muted: #6e6e73;
+  --border: rgba(0, 0, 0, 0.08);
+  --accent: #1d1d1f;
+  /* Notion-style icon palette (pageIcon.ts ICON_COLORS) -- a
+     "lucide:<name>:<color>" icon renders in --icon-<color>, and group
+     badges tint their background with a faint mix of the same color. */
+  --icon-gray: #91918e;
+  --icon-brown: #9f6b53;
+  --icon-yellow: #cb912f;
+  --icon-orange: #d9730d;
+  --icon-green: #448361;
+  --icon-blue: #337ea9;
+  --icon-purple: #9065b0;
+  --icon-pink: #c14c8a;
+  --icon-red: #d44c47;
+  --icon-tint-strength: 16%;
+  --accent-text: #ffffff;
+  --danger: #ff3b30;
+  --code-bg: #1e1e1e;
+  --code-text: #eeeeee;
+  /* Inline code (a `code` mark in running text), Notion-style: red
+     monospace on a soft neutral pill. Code blocks keep --code-bg. */
+  --inline-code-bg: rgba(135, 131, 120, 0.15);
+  --inline-code-text: #eb5757;
+  /* Code-block syntax-highlight token colors (lowlight/highlight.js
+     class names, see Editor.css). Deliberately not split into
+     light/dark variants like the tokens above -- --code-bg/--code-text
+     already stay dark in both themes (code chrome doesn't follow the
+     app theme, same as most editors), so one palette tuned against
+     that fixed dark background covers both. */
+  --hljs-comment: #6b7280;
+  --hljs-keyword: #c586c0;
+  --hljs-string: #98c379;
+  --hljs-number: #d19a66;
+  --hljs-function: #61afef;
+  --hljs-attr: #e5c07b;
+  --hljs-builtin: #56b6c2;
+  --hljs-variable: #e06c75;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-full: 999px;
+  --blur: 24px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-md:
+    0 8px 30px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  color-scheme: light;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    system-ui,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+/* Dark mode deliberately breaks from the light-theme "aurora" glass
+   look above -- flat, opaque, neutral grays instead, closer to
+   Notion's own dark theme, per direct request ("not purple and translucent,
+   more like Notion"). Blob colors go fully transparent (so
+   body::before's blurred gradients contribute nothing) and every
+   surface token becomes a solid color instead of translucent-over-blur
+   -- backdrop-filter still runs where components use it, but blurring
+   something fully opaque has no visible effect, so the glass look just
+   disappears on its own without touching every component that uses it. */
+:root[data-theme='dark'] {
+  --bg: #191919;
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+
+  --surface: #252525;
+  --surface-2: #1f1f1f;
+  --surface-solid: #202020;
+  --surface-hover: color-mix(in srgb, var(--text) 7%, var(--surface-solid));
+  --surface-hover-strong: color-mix(in srgb, var(--text) 14%, var(--surface-solid));
+  --text: #f5f5f7;
+  --text-muted: #98989d;
+  --border: rgba(255, 255, 255, 0.11);
+  --accent: #f5f5f7;
+  --icon-gray: #9b9b9b;
+  --icon-brown: #b07c64;
+  --icon-yellow: #d3a33c;
+  --icon-orange: #df8436;
+  --icon-green: #4f9a6c;
+  --icon-blue: #4a8ad8;
+  --icon-purple: #9a66d2;
+  --icon-pink: #d0508f;
+  --icon-red: #db4f4a;
+  --icon-tint-strength: 22%;
+  --accent-text: #0b0b0d;
+  --danger: #ff6961;
+  --code-bg: #0d0e12;
+  --code-text: #e5e7eb;
+  --inline-code-bg: rgba(255, 255, 255, 0.08);
+  --inline-code-text: #ff7b72;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  /* Thin, theme-colored scrollbars everywhere. Windows Chrome/Edge/Brave
+     otherwise draw thick classic bars (in the sidebar, the editor, every
+     popover); macOS and Safari keep their own overlay bars regardless. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+}
+
+/* The "aurora": soft blurred color blobs fixed behind everything. Glass
+   surfaces (see .card, .editor-shell, etc.) sample this through
+   backdrop-filter blur -- that's what actually reads as "glass" rather
+   than just a semi-transparent gray box. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 18%, var(--blob-1), transparent 42%),
+    radial-gradient(circle at 88% 12%, var(--blob-2), transparent 42%),
+    radial-gradient(circle at 50% 92%, var(--blob-3), transparent 45%);
+  filter: blur(70px);
+  pointer-events: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Buttons and inputs don't inherit the page's font/color by default in
+   any browser -- they use UA form-control styling instead. That
+   mismatch (explicit light backgrounds from our CSS + browser-chosen
+   dark-mode text color) is what made toolbar labels unreadable. */
+button,
+input {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  transition:
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Theme transition, in two layers:
+   1. A plain cross-fade via `transition` on the color tokens themselves
+      -- this is what every browser gets (Firefox included), and it's
+      also what plays while a View Transition's snapshot images are
+      static (see below), so it never looks like it's "fighting" the
+      circle reveal.
+   2. Where supported (Chromium, Safari 18+), src/theme.ts drives an
+      expanding-circle reveal from the toggle button via
+      document.startViewTransition, styled below. This is the
+      "apple-style" bit -- iOS/macOS use the same expanding-circle
+      language for their own appearance toggle. */
+:root {
+  transition: color 0.25s ease;
+}
+
+body {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.card,
+.editor-shell,
+.toolbar,
+.theme-toggle,
+.workspace-header,
+.card input,
+.toolbar-btn {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  body,
+  .card,
+  .editor-shell,
+  .toolbar,
+  .theme-toggle,
+  .workspace-header,
+  .card input,
+  .toolbar-btn,
+  button {
+    transition: none;
+  }
+
+  button:active {
+    transform: none;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+  clip-path: circle(0px at var(--theme-toggle-x, 50%) var(--theme-toggle-y, 50%));
+  animation: theme-reveal 0.55s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes theme-reveal {
+  to {
+    clip-path: circle(
+      var(--theme-toggle-radius, 150%) at var(--theme-toggle-x, 50%)
+        var(--theme-toggle-y, 50%)
+    );
+  }
+}
+
+/* Colored icons (pageIcon.ts) -- data-icon-color is set by PageIcon on
+   the icon itself, and by callers on a wrapping badge that tints its
+   background (see .group-icon-badge in Sidebar.css). */
+[data-icon-color='gray'] { --icon-color: var(--icon-gray); }
+[data-icon-color='brown'] { --icon-color: var(--icon-brown); }
+[data-icon-color='yellow'] { --icon-color: var(--icon-yellow); }
+[data-icon-color='orange'] { --icon-color: var(--icon-orange); }
+[data-icon-color='green'] { --icon-color: var(--icon-green); }
+[data-icon-color='blue'] { --icon-color: var(--icon-blue); }
+[data-icon-color='purple'] { --icon-color: var(--icon-purple); }
+[data-icon-color='pink'] { --icon-color: var(--icon-pink); }
+[data-icon-color='red'] { --icon-color: var(--icon-red); }
+[data-icon-color] { color: var(--icon-color); }
+
+/* Fluent Emoji 3D images (Emoji.tsx) sized like the emoji character
+   they replace: about one glyph, sitting on the text baseline. */
+.emoji-img {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  object-fit: contain;
+}

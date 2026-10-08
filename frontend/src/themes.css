@@ -1,0 +1,758 @@
+/* Color themes (Settings → Appearance, theme.ts). Each one only
+   overrides tokens from index.css. The light/dark base comes from
+   data-theme (so every existing [data-theme='dark'] rule still
+   applies); data-palette picks the colors. Nook Light / Nook Dark are
+   index.css itself and need nothing here.
+
+   Loaded after index.css: same specificity as :root[data-theme='dark'],
+   so the later rule wins. Values follow each theme's published palette
+   (GitHub Primer, VS Code, Catppuccin, Nord, Solarized, Gruvbox, ...),
+   mapped onto Nook's tokens. Light themes other than Nook Light are
+   flat: no aurora blobs, opaque surfaces. Dark themes inherit the
+   transparent blobs from the dark base.
+*/
+
+/* ---- GitHub Light (Primer) ---- */
+:root[data-palette='github-light'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-solid: #ffffff;
+  --text: #1f2328;
+  --text-muted: #59636e;
+  --border: #d1d9e0;
+  --accent: #0969da;
+  --accent-text: #ffffff;
+  --danger: #d1242f;
+  --code-bg: #f6f8fa;
+  --code-text: #1f2328;
+  --inline-code-bg: rgba(129, 139, 152, 0.12);
+  --inline-code-text: #1f2328;
+  --hljs-comment: #59636e;
+  --hljs-keyword: #cf222e;
+  --hljs-string: #0a3069;
+  --hljs-number: #0550ae;
+  --hljs-function: #8250df;
+  --hljs-attr: #0550ae;
+  --hljs-builtin: #953800;
+  --hljs-variable: #953800;
+  --shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
+  --shadow-md: 0 8px 24px rgba(66, 74, 83, 0.12), 0 1px 3px rgba(31, 35, 40, 0.12);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Light Modern (VS Code) ---- */
+:root[data-palette='light-modern'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f8f8f8;
+  --surface-solid: #ffffff;
+  --text: #3b3b3b;
+  --text-muted: #6f6f6f;
+  --border: #e5e5e5;
+  --accent: #005fb8;
+  --accent-text: #ffffff;
+  --danger: #c72e0f;
+  --code-bg: #f8f8f8;
+  --code-text: #3b3b3b;
+  --inline-code-bg: rgba(0, 0, 0, 0.06);
+  --inline-code-text: #a31515;
+  --hljs-comment: #008000;
+  --hljs-keyword: #0000ff;
+  --hljs-string: #a31515;
+  --hljs-number: #098658;
+  --hljs-function: #795e26;
+  --hljs-attr: #001080;
+  --hljs-builtin: #267f99;
+  --hljs-variable: #001080;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Catppuccin Latte ---- */
+:root[data-palette='catppuccin-latte'] {
+  --bg: #eff1f5;
+  --surface: #eff1f5;
+  --surface-2: #e6e9ef;
+  --surface-solid: #eff1f5;
+  --text: #4c4f69;
+  --text-muted: #6c6f85;
+  --border: #ccd0da;
+  --accent: #8839ef;
+  --accent-text: #ffffff;
+  --danger: #d20f39;
+  --code-bg: #e6e9ef;
+  --code-text: #4c4f69;
+  --inline-code-bg: #ccd0da;
+  --inline-code-text: #d20f39;
+  --hljs-comment: #9ca0b0;
+  --hljs-keyword: #8839ef;
+  --hljs-string: #40a02b;
+  --hljs-number: #fe640b;
+  --hljs-function: #1e66f5;
+  --hljs-attr: #df8e1d;
+  --hljs-builtin: #179299;
+  --hljs-variable: #e64553;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Nord Light (Snow Storm) ---- */
+:root[data-palette='nord-light'] {
+  --bg: #eceff4;
+  --surface: #eceff4;
+  --surface-2: #e5e9f0;
+  --surface-solid: #eceff4;
+  --text: #2e3440;
+  --text-muted: #4c566a;
+  --border: #d8dee9;
+  --accent: #5e81ac;
+  --accent-text: #ffffff;
+  --danger: #bf616a;
+  --code-bg: #e5e9f0;
+  --code-text: #2e3440;
+  --inline-code-bg: #d8dee9;
+  --inline-code-text: #5e81ac;
+  --hljs-comment: #7b88a1;
+  --hljs-keyword: #5e81ac;
+  --hljs-string: #5d7a3e;
+  --hljs-number: #a3689a;
+  --hljs-function: #3b6e8f;
+  --hljs-attr: #8f6a3c;
+  --hljs-builtin: #4c7f7d;
+  --hljs-variable: #b0563f;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Solarized Light ---- */
+:root[data-palette='solarized-light'] {
+  --bg: #fdf6e3;
+  --surface: #fdf6e3;
+  --surface-2: #eee8d5;
+  --surface-solid: #fdf6e3;
+  --text: #586e75;
+  --text-muted: #839496;
+  --border: #e3dcc6;
+  --accent: #268bd2;
+  --accent-text: #ffffff;
+  --danger: #dc322f;
+  --code-bg: #eee8d5;
+  --code-text: #586e75;
+  --inline-code-bg: #eee8d5;
+  --inline-code-text: #d33682;
+  --hljs-comment: #93a1a1;
+  --hljs-keyword: #859900;
+  --hljs-string: #2aa198;
+  --hljs-number: #d33682;
+  --hljs-function: #268bd2;
+  --hljs-attr: #b58900;
+  --hljs-builtin: #cb4b16;
+  --hljs-variable: #6c71c4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Gruvbox Light ---- */
+:root[data-palette='gruvbox-light'] {
+  --bg: #fbf1c7;
+  --surface: #fbf1c7;
+  --surface-2: #ebdbb2;
+  --surface-solid: #fbf1c7;
+  --text: #3c3836;
+  --text-muted: #7c6f64;
+  --border: #d5c4a1;
+  --accent: #af3a03;
+  --accent-text: #ffffff;
+  --danger: #9d0006;
+  --code-bg: #f2e5bc;
+  --code-text: #3c3836;
+  --inline-code-bg: #ebdbb2;
+  --inline-code-text: #9d0006;
+  --hljs-comment: #928374;
+  --hljs-keyword: #9d0006;
+  --hljs-string: #79740e;
+  --hljs-number: #8f3f71;
+  --hljs-function: #076678;
+  --hljs-attr: #b57614;
+  --hljs-builtin: #427b58;
+  --hljs-variable: #af3a03;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Paper: warm, paper-like, for long reading ---- */
+:root[data-palette='paper'] {
+  --bg: #f4ecd8;
+  --surface: #f8f1e3;
+  --surface-2: #ede3cc;
+  --surface-solid: #f8f1e3;
+  --text: #3b3127;
+  --text-muted: #7a6a55;
+  --border: #e0d4ba;
+  --accent: #8b5e34;
+  --accent-text: #ffffff;
+  --danger: #b3412f;
+  --code-bg: #ece2c9;
+  --code-text: #3b3127;
+  --inline-code-bg: rgba(120, 90, 50, 0.1);
+  --inline-code-text: #a03e3e;
+  --hljs-comment: #9a8a72;
+  --hljs-keyword: #8b3a62;
+  --hljs-string: #4f7a3a;
+  --hljs-number: #a6561c;
+  --hljs-function: #2f5f8a;
+  --hljs-attr: #8b5e34;
+  --hljs-builtin: #2f7a73;
+  --hljs-variable: #a03e3e;
+  --shadow-sm: 0 1px 2px rgba(80, 60, 30, 0.08);
+  --shadow-md: 0 8px 24px rgba(80, 60, 30, 0.14), 0 1px 3px rgba(80, 60, 30, 0.1);
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- High Contrast Light (VS Code) ---- */
+:root[data-palette='high-contrast-light'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-solid: #ffffff;
+  --text: #000000;
+  --text-muted: #292929;
+  --border: #0f4a85;
+  --accent: #0f4a85;
+  --accent-text: #ffffff;
+  --danger: #b5200d;
+  --code-bg: #ffffff;
+  --code-text: #000000;
+  --inline-code-bg: rgba(15, 74, 133, 0.1);
+  --inline-code-text: #0f4a85;
+  --hljs-comment: #515151;
+  --hljs-keyword: #0000ff;
+  --hljs-string: #a31515;
+  --hljs-number: #096d48;
+  --hljs-function: #5e2cbc;
+  --hljs-attr: #264f78;
+  --hljs-builtin: #185e73;
+  --hljs-variable: #001080;
+  --shadow-sm: none;
+  --shadow-md: 0 0 0 1px #0f4a85;
+  --blob-1: transparent;
+  --blob-2: transparent;
+  --blob-3: transparent;
+}
+
+/* ---- Nook Aurora Dark: the light theme's blurred color glass, at night ---- */
+:root[data-palette='nook-aurora-dark'] {
+  --bg: #101014;
+  --surface: rgba(30, 30, 38, 0.62);
+  --surface-2: rgba(22, 22, 28, 0.5);
+  --surface-solid: #16161b;
+  --text: #f5f5f7;
+  --text-muted: #9a9aa3;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #f5f5f7;
+  --accent-text: #0b0b0d;
+  --danger: #ff6961;
+  --code-bg: #0d0e12;
+  --code-text: #e5e7eb;
+  --inline-code-bg: rgba(255, 255, 255, 0.08);
+  --inline-code-text: #ff7b72;
+  --hljs-comment: #6b7280;
+  --hljs-keyword: #c586c0;
+  --hljs-string: #98c379;
+  --hljs-number: #d19a66;
+  --hljs-function: #61afef;
+  --hljs-attr: #e5c07b;
+  --hljs-builtin: #56b6c2;
+  --hljs-variable: #e06c75;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --blob-1: rgba(90, 110, 255, 0.22);
+  --blob-2: rgba(220, 80, 170, 0.18);
+  --blob-3: rgba(60, 200, 160, 0.14);
+}
+
+/* ---- GitHub Dark (Primer) ---- */
+:root[data-palette='github-dark'] {
+  --bg: #0d1117;
+  --surface: #151b23;
+  --surface-2: #010409;
+  --surface-solid: #0d1117;
+  --text: #e6edf3;
+  --text-muted: #9198a1;
+  --border: #30363d;
+  --accent: #2f81f7;
+  --accent-text: #ffffff;
+  --danger: #f85149;
+  --code-bg: #151b23;
+  --code-text: #e6edf3;
+  --inline-code-bg: rgba(101, 108, 118, 0.2);
+  --inline-code-text: #e6edf3;
+  --hljs-comment: #9198a1;
+  --hljs-keyword: #ff7b72;
+  --hljs-string: #a5d6ff;
+  --hljs-number: #79c0ff;
+  --hljs-function: #d2a8ff;
+  --hljs-attr: #79c0ff;
+  --hljs-builtin: #ffa657;
+  --hljs-variable: #ffa657;
+  --shadow-sm: 0 0 0 1px #30363d;
+  --shadow-md: 0 8px 24px rgba(1, 4, 9, 0.75), 0 0 0 1px #3d444d;
+}
+
+/* ---- Dark Modern (VS Code) ---- */
+:root[data-palette='dark-modern'] {
+  --bg: #1f1f1f;
+  --surface: #222222;
+  --surface-2: #181818;
+  --surface-solid: #1f1f1f;
+  --text: #cccccc;
+  --text-muted: #9d9d9d;
+  --border: #2b2b2b;
+  --accent: #0078d4;
+  --accent-text: #ffffff;
+  --danger: #f85149;
+  --code-bg: #181818;
+  --code-text: #cccccc;
+  --inline-code-bg: rgba(255, 255, 255, 0.08);
+  --inline-code-text: #ce9178;
+  --hljs-comment: #6a9955;
+  --hljs-keyword: #569cd6;
+  --hljs-string: #ce9178;
+  --hljs-number: #b5cea8;
+  --hljs-function: #dcdcaa;
+  --hljs-attr: #9cdcfe;
+  --hljs-builtin: #4ec9b0;
+  --hljs-variable: #9cdcfe;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px #2b2b2b;
+}
+
+/* ---- One Dark Pro ---- */
+:root[data-palette='one-dark-pro'] {
+  --bg: #282c34;
+  --surface: #21252b;
+  --surface-2: #21252b;
+  --surface-solid: #282c34;
+  --text: #abb2bf;
+  --text-muted: #7f848e;
+  --border: #3e4452;
+  --accent: #4d78cc;
+  --accent-text: #ffffff;
+  --danger: #e06c75;
+  --code-bg: #21252b;
+  --code-text: #abb2bf;
+  --inline-code-bg: rgba(255, 255, 255, 0.07);
+  --inline-code-text: #e06c75;
+  --hljs-comment: #7f848e;
+  --hljs-keyword: #c678dd;
+  --hljs-string: #98c379;
+  --hljs-number: #d19a66;
+  --hljs-function: #61afef;
+  --hljs-attr: #e5c07b;
+  --hljs-builtin: #56b6c2;
+  --hljs-variable: #e06c75;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Dracula ---- */
+:root[data-palette='dracula'] {
+  --bg: #282a36;
+  --surface: #343746;
+  --surface-2: #21222c;
+  --surface-solid: #282a36;
+  --text: #f8f8f2;
+  --text-muted: #9aa3c7;
+  --border: #44475a;
+  --accent: #bd93f9;
+  --accent-text: #282a36;
+  --danger: #ff5555;
+  --code-bg: #21222c;
+  --code-text: #f8f8f2;
+  --inline-code-bg: #44475a;
+  --inline-code-text: #ff79c6;
+  --hljs-comment: #6272a4;
+  --hljs-keyword: #ff79c6;
+  --hljs-string: #f1fa8c;
+  --hljs-number: #bd93f9;
+  --hljs-function: #50fa7b;
+  --hljs-attr: #50fa7b;
+  --hljs-builtin: #8be9fd;
+  --hljs-variable: #ffb86c;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Nord ---- */
+:root[data-palette='nord'] {
+  --bg: #2e3440;
+  --surface: #3b4252;
+  --surface-2: #292e39;
+  --surface-solid: #2e3440;
+  --text: #eceff4;
+  --text-muted: #99a3b6;
+  --border: #3b4252;
+  --accent: #88c0d0;
+  --accent-text: #2e3440;
+  --danger: #bf616a;
+  --code-bg: #3b4252;
+  --code-text: #d8dee9;
+  --inline-code-bg: #3b4252;
+  --inline-code-text: #88c0d0;
+  --hljs-comment: #616e88;
+  --hljs-keyword: #81a1c1;
+  --hljs-string: #a3be8c;
+  --hljs-number: #b48ead;
+  --hljs-function: #88c0d0;
+  --hljs-attr: #8fbcbb;
+  --hljs-builtin: #8fbcbb;
+  --hljs-variable: #ebcb8b;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Catppuccin Frappé ---- */
+:root[data-palette='catppuccin-frappe'] {
+  --bg: #303446;
+  --surface: #414559;
+  --surface-2: #292c3c;
+  --surface-solid: #303446;
+  --text: #c6d0f5;
+  --text-muted: #a5adce;
+  --border: #414559;
+  --accent: #ca9ee6;
+  --accent-text: #232634;
+  --danger: #e78284;
+  --code-bg: #292c3c;
+  --code-text: #c6d0f5;
+  --inline-code-bg: #414559;
+  --inline-code-text: #e78284;
+  --hljs-comment: #737994;
+  --hljs-keyword: #ca9ee6;
+  --hljs-string: #a6d189;
+  --hljs-number: #ef9f76;
+  --hljs-function: #8caaee;
+  --hljs-attr: #e5c890;
+  --hljs-builtin: #81c8be;
+  --hljs-variable: #ea999c;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Catppuccin Macchiato ---- */
+:root[data-palette='catppuccin-macchiato'] {
+  --bg: #24273a;
+  --surface: #363a4f;
+  --surface-2: #1e2030;
+  --surface-solid: #24273a;
+  --text: #cad3f5;
+  --text-muted: #a5adcb;
+  --border: #363a4f;
+  --accent: #c6a0f6;
+  --accent-text: #181926;
+  --danger: #ed8796;
+  --code-bg: #1e2030;
+  --code-text: #cad3f5;
+  --inline-code-bg: #363a4f;
+  --inline-code-text: #ed8796;
+  --hljs-comment: #6e738d;
+  --hljs-keyword: #c6a0f6;
+  --hljs-string: #a6da95;
+  --hljs-number: #f5a97f;
+  --hljs-function: #8aadf4;
+  --hljs-attr: #eed49f;
+  --hljs-builtin: #8bd5ca;
+  --hljs-variable: #ee99a0;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Catppuccin Mocha ---- */
+:root[data-palette='catppuccin-mocha'] {
+  --bg: #1e1e2e;
+  --surface: #313244;
+  --surface-2: #181825;
+  --surface-solid: #1e1e2e;
+  --text: #cdd6f4;
+  --text-muted: #a6adc8;
+  --border: #313244;
+  --accent: #cba6f7;
+  --accent-text: #11111b;
+  --danger: #f38ba8;
+  --code-bg: #181825;
+  --code-text: #cdd6f4;
+  --inline-code-bg: #313244;
+  --inline-code-text: #f38ba8;
+  --hljs-comment: #6c7086;
+  --hljs-keyword: #cba6f7;
+  --hljs-string: #a6e3a1;
+  --hljs-number: #fab387;
+  --hljs-function: #89b4fa;
+  --hljs-attr: #f9e2af;
+  --hljs-builtin: #94e2d5;
+  --hljs-variable: #eba0ac;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Solarized Dark ---- */
+:root[data-palette='solarized-dark'] {
+  --bg: #002b36;
+  --surface: #073642;
+  --surface-2: #00212b;
+  --surface-solid: #002b36;
+  --text: #93a1a1;
+  --text-muted: #839496;
+  --border: #0b4250;
+  --accent: #268bd2;
+  --accent-text: #ffffff;
+  --danger: #dc322f;
+  --code-bg: #073642;
+  --code-text: #93a1a1;
+  --inline-code-bg: #073642;
+  --inline-code-text: #d33682;
+  --hljs-comment: #586e75;
+  --hljs-keyword: #859900;
+  --hljs-string: #2aa198;
+  --hljs-number: #d33682;
+  --hljs-function: #268bd2;
+  --hljs-attr: #b58900;
+  --hljs-builtin: #cb4b16;
+  --hljs-variable: #6c71c4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Tokyo Night ---- */
+:root[data-palette='tokyo-night'] {
+  --bg: #1a1b26;
+  --surface: #1f2335;
+  --surface-2: #16161e;
+  --surface-solid: #1a1b26;
+  --text: #c0caf5;
+  --text-muted: #8089b3;
+  --border: #292e42;
+  --accent: #7aa2f7;
+  --accent-text: #1a1b26;
+  --danger: #f7768e;
+  --code-bg: #16161e;
+  --code-text: #a9b1d6;
+  --inline-code-bg: #292e42;
+  --inline-code-text: #7dcfff;
+  --hljs-comment: #565f89;
+  --hljs-keyword: #bb9af7;
+  --hljs-string: #9ece6a;
+  --hljs-number: #ff9e64;
+  --hljs-function: #7aa2f7;
+  --hljs-attr: #7dcfff;
+  --hljs-builtin: #2ac3de;
+  --hljs-variable: #e0af68;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Gruvbox Dark ---- */
+:root[data-palette='gruvbox-dark'] {
+  --bg: #282828;
+  --surface: #3c3836;
+  --surface-2: #1d2021;
+  --surface-solid: #282828;
+  --text: #ebdbb2;
+  --text-muted: #a89984;
+  --border: #3c3836;
+  --accent: #fabd2f;
+  --accent-text: #282828;
+  --danger: #fb4934;
+  --code-bg: #1d2021;
+  --code-text: #ebdbb2;
+  --inline-code-bg: #3c3836;
+  --inline-code-text: #fe8019;
+  --hljs-comment: #928374;
+  --hljs-keyword: #fb4934;
+  --hljs-string: #b8bb26;
+  --hljs-number: #d3869b;
+  --hljs-function: #fabd2f;
+  --hljs-attr: #83a598;
+  --hljs-builtin: #8ec07c;
+  --hljs-variable: #fe8019;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- High Contrast Dark (VS Code) ---- */
+:root[data-palette='high-contrast-dark'] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-2: #000000;
+  --surface-solid: #000000;
+  --text: #ffffff;
+  --text-muted: #cccccc;
+  --border: #6fc3df;
+  --accent: #f38518;
+  --accent-text: #000000;
+  --danger: #f48771;
+  --code-bg: #000000;
+  --code-text: #ffffff;
+  --inline-code-bg: rgba(255, 255, 255, 0.12);
+  --inline-code-text: #f38518;
+  --hljs-comment: #7ca668;
+  --hljs-keyword: #569cd6;
+  --hljs-string: #ce9178;
+  --hljs-number: #b5cea8;
+  --hljs-function: #dcdcaa;
+  --hljs-attr: #9cdcfe;
+  --hljs-builtin: #4ec9b0;
+  --hljs-variable: #9cdcfe;
+  --shadow-sm: none;
+  --shadow-md: 0 0 0 1px #6fc3df;
+}
+
+/* ---- Accent colors ----
+   Override any theme's --accent (data-accent, unless "Theme default").
+   After the palettes so they win at equal specificity; dark bases get
+   a lighter shade. */
+:root[data-accent='blue'] {
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='blue'] {
+  --accent: #4c8dff;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='purple'] {
+  --accent: #7c3aed;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='purple'] {
+  --accent: #a78bfa;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='pink'] {
+  --accent: #db2777;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='pink'] {
+  --accent: #f472b6;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='red'] {
+  --accent: #dc2626;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='red'] {
+  --accent: #f87171;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='orange'] {
+  --accent: #ea580c;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='orange'] {
+  --accent: #fb923c;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='yellow'] {
+  --accent: #b98900;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='yellow'] {
+  --accent: #facc15;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='green'] {
+  --accent: #16a34a;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='green'] {
+  --accent: #4ade80;
+  --accent-text: #0b0b0d;
+}
+
+:root[data-accent='teal'] {
+  --accent: #0d9488;
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'][data-accent='teal'] {
+  --accent: #2dd4bf;
+  --accent-text: #0b0b0d;
+}
+
+/* ---- Where the accent shows ----
+   Nook's own themes use the text color as accent (monochrome), so these
+   only switch on when it's actually a color: an accent was picked
+   (data-accent), or the theme has a colored accent of its own (every
+   palette except the nook-* ones). */
+:is(:root[data-accent], :root:not([data-palette^='nook'])) {
+  /* The tint behind "selected" things: the active sidebar page, the
+     active tab, the open settings section, a selected list option. */
+  --accent-tint: color-mix(in srgb, var(--accent) 22%, var(--surface-solid));
+}
+
+/* "body" only adds specificity: the component rules these replace
+   (e.g. :root[data-theme='dark'] .page-row.active) are equally specific
+   without it and load later, so they'd win. */
+:is(:root[data-accent], :root:not([data-palette^='nook'])) body .page-row.active,
+:is(:root[data-accent], :root:not([data-palette^='nook'])) body .search-result.active,
+:is(:root[data-accent], :root:not([data-palette^='nook'])) body .settings-nav button.active,
+:is(:root[data-accent], :root:not([data-palette^='nook'])) body .theme-option.selected {
+  background: var(--accent-tint);
+  box-shadow: none;
+}
+
+/* The active tab: VS Code's colored top edge. */
+:is(:root[data-accent], :root:not([data-palette^='nook'])) .tab.active {
+  box-shadow:
+    inset 0 2px 0 0 var(--accent),
+    var(--shadow-sm);
+}
+
+:is(:root[data-accent], :root:not([data-palette^='nook'])) .editor-content a {
+  color: var(--accent);
+}
+
+:is(:root[data-accent], :root:not([data-palette^='nook'])) ::selection {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+:is(:root[data-accent], :root:not([data-palette^='nook'])) .editor-content {
+  caret-color: var(--accent);
+}
+
+/* Checkboxes (to-do items, checkbox cells) everywhere. */
+:root input[type='checkbox'] {
+  accent-color: var(--accent);
+}
