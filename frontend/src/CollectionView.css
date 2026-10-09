@@ -6,27 +6,6 @@
   gap: 1rem;
 }
 
-.collection-title {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0.25rem 0 0;
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text);
-}
-
-.collection-title-icon {
-  font-size: 1.9rem;
-  line-height: 1;
-}
-
-.collection-title-icon svg {
-  width: 1em;
-  height: 1em;
-}
-
 .collection-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -93,7 +72,26 @@
 }
 
 .collection-item {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.35rem;
+  border-radius: var(--radius-sm);
+}
+
+.collection-item:hover,
+.collection-item-menu-open {
+  background: var(--surface-hover);
+}
+
+/* Being dragged towards the sidebar. */
+.collection-item-dragging {
+  opacity: 0.4;
+}
+
+.collection-item-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -107,8 +105,25 @@
   cursor: pointer;
 }
 
-.collection-item:hover {
-  background: var(--surface-hover);
+.collection-item-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.35rem;
+  margin: -0.1rem 0 -0.1rem -0.35rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+}
+
+/* Sidebar.css's .row-menu-btn, revealed on row hover the same way. */
+.collection-item:hover .collection-item-menu-btn,
+.collection-item-menu-open .collection-item-menu-btn,
+.collection-item-menu-btn:focus-visible {
+  opacity: 1;
 }
 
 .collection-item-icon {
@@ -164,13 +179,10 @@
   font-size: 0.9rem;
 }
 
-/* Phones: the date drops to a second line under the title. */
+/* Phones: the date drops to a second line under the title. (On touch
+   screens the row menu is always shown: mobile.css, hover: none.) */
 @media (max-width: 768px) {
-  .collection-title {
-    font-size: 1.6rem;
-  }
-
-  .collection-item {
+  .collection-item-main {
     flex-wrap: wrap;
     row-gap: 0.15rem;
   }

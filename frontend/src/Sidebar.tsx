@@ -10,6 +10,7 @@ import SidebarSearch from './SidebarSearch'
 import Collapse from './Collapse'
 import { usePresence } from './usePresence'
 import { startPointerDrag } from './pointerDrag'
+import { endExternalPageDrag, externalPageDrag } from './pageDrag'
 import './Sidebar.css'
 
 // Touch screens (no hover): the grips are hidden there and too small to
@@ -1440,9 +1441,23 @@ export default function Sidebar({
     }
   }
 
+  // The page being dragged: one of the sidebar's own rows, or an item
+  // dragged in from a collection's list (pageDrag.ts).
+  const currentDraggedPageId = () => draggedPageId ?? externalPageDrag()
+
+  // A drag from a collection's list that ends without a drop here (let
+  // go elsewhere, or cancelled with Escape) must not leave a drop marker
+  // behind on the last row it passed over.
+  useEffect(() => {
+    const clear = () => setPageDropTarget(null)
+    document.addEventListener('dragend', clear)
+    return () => document.removeEventListener('dragend', clear)
+  }, [])
+
   function handlePageDragOver(pageId: string) {
     return (e: React.DragEvent) => {
-      if (!draggedPageId || draggedPageId === pageId) return
+      const draggedId = currentDraggedPageId()
+      if (!draggedId || draggedId === pageId) return
       e.preventDefault()
       e.stopPropagation()
       const rect = e.currentTarget.getBoundingClientRect()
@@ -1450,7 +1465,7 @@ export default function Sidebar({
       let position: 'before' | 'after' | 'into' = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'into'
       // A collection can't go into a collection or a database
       // (pages.CanHold on the backend): only beside it.
-      if (position === 'into' && findPage(teamspaces, draggedPageId)?.kind === 'collection') {
+      if (position === 'into' && findPage(teamspaces, draggedId)?.kind === 'collection') {
         const targetKind = findPage(teamspaces, pageId)?.kind
         if (targetKind === 'collection' || targetKind === 'database') position = ratio < 0.5 ? 'before' : 'after'
       }
@@ -1470,13 +1485,14 @@ export default function Sidebar({
       // this one didn't, which is what made a within-group space
       // reorder fail specifically whenever the drop landed over a
       // page row instead of empty space in the target section.
-      if (!draggedPageId) return
+      const draggedId = currentDraggedPageId()
+      if (!draggedId) return
       e.preventDefault()
       e.stopPropagation()
-      const draggedId = draggedPageId
       const target = pageDropTarget
       setDraggedPageId(null)
       setPageDropTarget(null)
+      endExternalPageDrag()
       if (draggedId === pageId || !target) return
       if (target.position === 'into') {
         onMovePageTo(draggedId, spaceId, pageId)
@@ -1508,19 +1524,20 @@ export default function Sidebar({
   // page-tree drop zone, so this is the one spot in a space that isn't
   // already "before/after/into" some specific existing page row.
   function handleTeamspaceHeaderDragOver(e: React.DragEvent) {
-    if (!draggedPageId) return
+    if (!currentDraggedPageId()) return
     e.preventDefault()
     e.stopPropagation()
   }
 
   function handleTeamspaceHeaderDrop(spaceId: string) {
     return (e: React.DragEvent) => {
-      if (!draggedPageId) return
+      const pageId = currentDraggedPageId()
+      if (!pageId) return
       e.preventDefault()
       e.stopPropagation()
-      const pageId = draggedPageId
       setDraggedPageId(null)
       setPageDropTarget(null)
+      endExternalPageDrag()
       onMovePageTo(pageId, spaceId, null)
     }
   }

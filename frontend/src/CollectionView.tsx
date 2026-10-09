@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listCollectionItems, type CollectionItem, type PageKind } from './api'
 import { useLiveRefresh } from './liveEvents'
+import { endExternalPageDrag, startExternalPageDrag } from './pageDrag'
 import PageIcon from './PageIcon'
 import { DEFAULT_DATABASE_ICON, DEFAULT_ICON } from './pageIcon'
 import Popover from './Popover'
@@ -10,6 +11,8 @@ import './CollectionView.css'
 // a list (most recently edited first by default) with a filter and a
 // sort, so they don't each take a row in the sidebar. Items open as
 // pages; "New" adds a document or a database inside the collection.
+// Each row's menu renames or archives the item, and a row can be dragged
+// onto the sidebar to move it out of the collection.
 
 type Sort = 'edited' | 'title' | 'created'
 
@@ -46,18 +49,31 @@ function initials(name: string): string {
 
 export default function CollectionView({
   page,
+  childrenKey,
   onOpenPage,
   onCreatePage,
+  onRenamePage,
+  onArchivePage,
 }: {
   page: { id: string; space_id: string; title: string; icon: string }
+  /** The collection's children as the sidebar tree has them. It changes
+   * when an item is renamed, archived, added, or dragged out, and the
+   * list re-fetches then -- without waiting for the live signal. */
+  childrenKey: string
   onOpenPage: (id: string) => void
   onCreatePage: (spaceId: string, parentId: string, kind: PageKind) => void
+  onRenamePage: (id: string, title: string) => Promise<void> | void
+  onArchivePage: (id: string) => Promise<void> | void
 }) {
   const [items, setItems] = useState<CollectionItem[] | null>(null)
   const [filter, setFilter] = useState('')
   const [sort, setSort] = useState<Sort>(readSort)
   const [newAnchor, setNewAnchor] = useState<HTMLButtonElement | null>(null)
   const newBtnRef = useRef<HTMLButtonElement>(null)
+  const [menu, setMenu] = useState<{ id: string; anchor: HTMLButtonElement } | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draggedId, setDraggedId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -69,7 +85,7 @@ export default function CollectionView({
     return () => {
       cancelled = true
     }
-  }, [page.id])
+  }, [page.id, childrenKey])
 
   // Pages added, moved, renamed or archived anywhere arrive as a live
   // "tree" signal: re-fetch the list.
@@ -78,6 +94,33 @@ export default function CollectionView({
       .then(setItems)
       .catch((e) => console.error('failed to refresh collection', e))
   })
+
+  function startRename(item: CollectionItem) {
+    setMenu(null)
+    setDraftTitle(item.title)
+    setRenamingId(item.id)
+  }
+
+  function commitRename(item: CollectionItem) {
+    // Escape already ended the rename; the blur that follows it is ignored.
+    if (renamingId !== item.id) return
+    setRenamingId(null)
+    const title = draftTitle.trim()
+    if (title === item.title.trim()) return
+    // Shown at once; the save itself goes through App's renamePage (tab,
+    // tree, API), and the re-fetch that follows brings the stored name.
+    setItems((list) => list?.map((i) => (i.id === item.id ? { ...i, title } : i)) ?? list)
+    void onRenamePage(item.id, title)
+  }
+
+  async function archive(item: CollectionItem) {
+    setMenu(null)
+    if (!window.confirm(`Archive "${item.title || 'Untitled'}"?`)) return
+    await onArchivePage(item.id)
+    listCollectionItems(page.id)
+      .then(setItems)
+      .catch((e) => console.error('failed to refresh collection', e))
+  }
 
   useEffect(() => {
     try {
@@ -104,11 +147,6 @@ export default function CollectionView({
 
   return (
     <div className="collection-view">
-      <h1 className="collection-title">
-        <PageIcon icon={page.icon} className="collection-title-icon" />
-        <span>{page.title || 'Untitled'}</span>
-      </h1>
-
       <div className="collection-toolbar">
         <div className="collection-filter">
           <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
@@ -165,16 +203,80 @@ export default function CollectionView({
         <ul className="collection-list">
           {shown.map((item) => (
             <li key={item.id}>
-              <button type="button" className="collection-item" onClick={() => onOpenPage(item.id)}>
-                <PageIcon icon={item.icon} className="collection-item-icon" />
-                <span className="collection-item-title">{item.title || 'Untitled'}</span>
-                <span className="collection-item-date">
-                  {formatDate(sort === 'created' ? item.created_at : item.updated_at)}
-                </span>
-                <span className="collection-item-who" title={item.updated_by_name || undefined}>
-                  {initials(item.updated_by_name)}
-                </span>
-              </button>
+              <div
+                className={[
+                  'collection-item',
+                  draggedId === item.id && 'collection-item-dragging',
+                  menu?.id === item.id && 'collection-item-menu-open',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                draggable={renamingId !== item.id}
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', item.title || 'Untitled')
+                  startExternalPageDrag(item.id)
+                  setDraggedId(item.id)
+                }}
+                onDragEnd={() => {
+                  endExternalPageDrag()
+                  setDraggedId(null)
+                }}
+              >
+                {renamingId === item.id ? (
+                  <div className="collection-item-main">
+                    <PageIcon icon={item.icon} className="collection-item-icon" />
+                    <input
+                      className="collection-item-title-input"
+                      value={draftTitle}
+                      placeholder="Untitled"
+                      aria-label="Name"
+                      autoFocus
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={() => commitRename(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        else if (e.key === 'Escape') setRenamingId(null)
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button type="button" className="collection-item-main" onClick={() => onOpenPage(item.id)}>
+                    <PageIcon icon={item.icon} className="collection-item-icon" />
+                    <span className="collection-item-title">{item.title || 'Untitled'}</span>
+                    <span className="collection-item-date">
+                      {formatDate(sort === 'created' ? item.created_at : item.updated_at)}
+                    </span>
+                    <span className="collection-item-who" title={item.updated_by_name || undefined}>
+                      {initials(item.updated_by_name)}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="row-menu-btn collection-item-menu-btn"
+                  aria-label={`More actions for ${item.title || 'Untitled'}`}
+                  title="More actions"
+                  onClick={(e) => setMenu({ id: item.id, anchor: e.currentTarget })}
+                >
+                  ⋮
+                </button>
+                {menu?.id === item.id && (
+                  <Popover anchorEl={menu.anchor} width={170} onClose={() => setMenu(null)} className="create-menu">
+                    <button type="button" className="create-menu-item" onClick={() => startRename(item)}>
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      className="create-menu-item create-menu-item-danger"
+                      onClick={() => void archive(item)}
+                    >
+                      Archive
+                    </button>
+                  </Popover>
+                )}
+              </div>
             </li>
           ))}
         </ul>

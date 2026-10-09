@@ -1,7 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PageIcon from './PageIcon'
 import Popover from './Popover'
 import './TabBar.css'
+
+// Touch screens (no hover): tabs keep using HTML5 drag-and-drop, which
+// main.tsx's polyfill starts with a long-press, as the sidebar does.
+const TOUCH_DRAG = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
+// How far (px) a mouse has to move with the button down before a press
+// on a tab becomes a drag instead of a click.
+const DRAG_THRESHOLD = 5
 
 export interface OpenTab {
   id: string
@@ -43,14 +51,83 @@ export default function TabBar({
 }) {
   const pendingLabel = `${pendingApprovals} sign-up${pendingApprovals === 1 ? '' : 's'} awaiting approval`
   const [accountAnchor, setAccountAnchor] = useState<HTMLButtonElement | null>(null)
-  // The whole tab is the drag source, not a separate grip like
-  // DatabaseView.tsx's column headers need -- there's no rename/menu
-  // click target living on the same element to protect here, just
-  // "select this tab," and browsers already suppress a click after an
-  // actual drag happened, same as real browser tabs.
+  // The whole tab is the drag source. With a mouse the drag is tracked
+  // with pointer events, not HTML5 drag-and-drop: in the macOS Dock web
+  // app (Safari "Add to Dock") tabs could be neither moved nor closed,
+  // while a normal browser tab worked. The native drag of a draggable
+  // tab is the part that differs between the two, and a press on the
+  // close button inside it can turn into that drag instead of a click.
+  // Pointer events behave the same in a browser tab and in a web app
+  // window. Touch keeps the HTML5 path (TOUCH_DRAG above).
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null)
   const [dropTargetTabId, setDropTargetTabId] = useState<string | null>(null)
+  // Set when a mouse drag just ended, so the click that follows the
+  // release doesn't also select the tab under the pointer.
+  const suppressClick = useRef(false)
+  const stopPointerDrag = useRef<(() => void) | null>(null)
 
+  useEffect(() => () => stopPointerDrag.current?.(), [])
+
+  function tabIdAt(x: number, y: number): string | null {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-tab-id]')
+    return el?.dataset.tabId ?? null
+  }
+
+  function handlePointerDown(tabId: string) {
+    return (e: React.PointerEvent) => {
+      if (TOUCH_DRAG || e.pointerType === 'touch' || e.button !== 0) return
+      const startX = e.clientX
+      const startY = e.clientY
+      let dragging = false
+      let target: string | null = null
+      const body = document.body.style
+      const prevSelect = body.userSelect
+
+      const move = (ev: PointerEvent) => {
+        if (!dragging) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
+          dragging = true
+          body.userSelect = 'none'
+          setDraggedTabId(tabId)
+        }
+        const over = tabIdAt(ev.clientX, ev.clientY)
+        target = over && over !== tabId ? over : null
+        setDropTargetTabId(target)
+      }
+      const end = (ev: PointerEvent) => {
+        stop()
+        if (!dragging) return
+        suppressClick.current = true
+        // A click only follows a release over the same element; clear the
+        // flag in case none comes.
+        window.setTimeout(() => (suppressClick.current = false), 0)
+        if (ev.type === 'pointerup' && target) onReorderTabs(tabId, target)
+      }
+      const cancel = (ev: KeyboardEvent) => {
+        if (ev.key !== 'Escape') return
+        target = null
+        end(new PointerEvent('pointercancel'))
+      }
+      const stop = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', end)
+        window.removeEventListener('pointercancel', end)
+        window.removeEventListener('keydown', cancel)
+        body.userSelect = prevSelect
+        setDraggedTabId(null)
+        setDropTargetTabId(null)
+        stopPointerDrag.current = null
+      }
+      stopPointerDrag.current?.()
+      stopPointerDrag.current = stop
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', end)
+      window.addEventListener('pointercancel', end)
+      window.addEventListener('keydown', cancel)
+    }
+  }
+
+  // HTML5 drag-and-drop, touch screens only (started by the polyfill).
   function handleDragStart(tabId: string) {
     return (e: React.DragEvent) => {
       e.dataTransfer.effectAllowed = 'move'
@@ -125,18 +202,29 @@ export default function TabBar({
             ]
               .filter(Boolean)
               .join(' ')}
-            draggable
-            onDragStart={handleDragStart(tab.id)}
-            onDragOver={handleDragOver(tab.id)}
-            onDragLeave={() => setDropTargetTabId((cur) => (cur === tab.id ? null : cur))}
-            onDrop={handleDrop(tab.id)}
-            onDragEnd={handleDragEnd}
-            onClick={() => onSelectTab(tab.id)}
+            data-tab-id={tab.id}
+            onPointerDown={handlePointerDown(tab.id)}
+            draggable={TOUCH_DRAG || undefined}
+            onDragStart={TOUCH_DRAG ? handleDragStart(tab.id) : undefined}
+            onDragOver={TOUCH_DRAG ? handleDragOver(tab.id) : undefined}
+            onDragLeave={TOUCH_DRAG ? () => setDropTargetTabId((cur) => (cur === tab.id ? null : cur)) : undefined}
+            onDrop={TOUCH_DRAG ? handleDrop(tab.id) : undefined}
+            onDragEnd={TOUCH_DRAG ? handleDragEnd : undefined}
+            onClick={() => {
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
+              onSelectTab(tab.id)
+            }}
           >
             <PageIcon icon={tab.icon} className="tab-icon" />
             <span className="tab-title">{tab.title}</span>
             <button
               className="tab-close"
+              draggable={false}
+              // Never the start of a tab drag: a press here is a close.
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation()
                 onCloseTab(tab.id)

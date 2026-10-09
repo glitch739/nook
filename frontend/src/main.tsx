@@ -7,8 +7,10 @@ import App from './App.tsx'
 import { applyStoredThemeEarly } from './theme'
 import { enableDragDropTouch } from '@dragdroptouch/drag-drop-touch'
 import { enableTouchDragExtras } from './touchDrag'
+import { watchStandaloneTitlebar } from './standaloneTitlebar'
 
 applyStoredThemeEarly()
+watchStandaloneTitlebar()
 
 // Every reorder in the app (sidebar pages/spaces/groups, tabs, database
 // columns) uses HTML5 drag-and-drop, which touch screens don't fire.

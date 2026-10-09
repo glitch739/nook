@@ -1,0 +1,87 @@
+/* PageTitle.tsx: the open page's icon and name above the toolbar. Same
+   column as the editor and PageMeta; colors come from the theme tokens,
+   so it follows light/dark and every palette. */
+.page-title-bar {
+  width: 100%;
+  max-width: var(--content-max-width, 60rem);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.6rem 0 0.25rem;
+}
+
+.page-title-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.page-title-icon:hover {
+  background: var(--surface-hover);
+}
+
+.page-title-glyph {
+  line-height: 1;
+}
+
+.page-title-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.page-title-field {
+  flex: 1;
+  min-width: 0;
+  padding: 0.15rem 0.35rem;
+  margin-left: -0.35rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+}
+
+.page-title-field::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.page-title-field:hover {
+  background: var(--surface-hover);
+}
+
+.page-title-field:focus {
+  background: transparent;
+}
+
+@media (max-width: 768px) {
+  :root .page-title-bar {
+    margin-top: 0.25rem;
+  }
+
+  :root .page-title-icon {
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 1.45rem;
+  }
+
+  /* 1.6rem matches the phone h1 size; also above 16px, so iOS won't zoom. */
+  :root .page-title-field {
+    font-size: 1.6rem;
+  }
+}

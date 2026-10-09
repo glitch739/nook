@@ -204,3 +204,14 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* standaloneTitlebar.ts: a desktop web app window that draws the page
+   under its own title bar. The tab bar and the sidebar move down out of
+   that strip so their controls get the clicks, not the window. */
+:root.titlebar-overlap .tab-bar {
+  padding-top: calc(0.6rem + var(--titlebar-inset, 28px));
+}
+
+:root.titlebar-overlap .sidebar {
+  padding-top: calc(1rem + var(--titlebar-inset, 28px));
+}

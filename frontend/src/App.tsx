@@ -61,6 +61,7 @@ import { useIsMobile } from './useIsMobile'
 import { preloadable } from './preloadable'
 import { usePendingApprovals } from './usePendingApprovals'
 import { emitLiveEvent } from './liveEvents'
+import PageTitle from './PageTitle'
 import './App.css'
 
 // Lazy: both are only needed once a page is actually open (never on the
@@ -150,11 +151,14 @@ export default function App() {
   // carry the slim treeNodeResponse shape (no content_json, see
   // internal/httpapi/pages.go).
   const [activePage, setActivePage] = useState<Page | null>(null)
+  // A page created a moment ago opens with its (empty) name focused.
+  const [focusTitleId, setFocusTitleId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readStoredSidebarCollapsed)
   // Phone layout (mobile.css): the sidebar is an overlay drawer with
   // its own open/closed state -- closed by default, never persisted,
   // and independent of the desktop collapse preference above.
   const isMobile = useIsMobile()
+  const activeNode = activeId ? findPage(teamspaces, activeId) : null
 
   // Open tabs survive a refresh: kept per user in this browser and
   // restored once the sidebar tree has loaded, keeping only pages that
@@ -394,6 +398,7 @@ export default function App() {
       setTeamspaces((ts) => insertPage(ts, spaceId, parentId, node))
       setOpenTabs((tabs) => [...tabs, { id: page.id, title: page.title || 'Untitled', icon: page.icon }])
       setMobileSidebarOpen(false)
+      setFocusTitleId(page.id)
       setActiveId(page.id)
     } catch (e) {
       console.error('failed to create page', e)
@@ -927,13 +932,28 @@ export default function App() {
               <>
                 <PageCover key={activeId} pageId={activePage.id} />
                 <PageMeta key={`meta-${activeId}`} page={activePage} meId={user.id} />
+                {/* The tree has the freshest name and icon (a rename in the
+                    sidebar, or one by someone else arriving live); a page
+                    the tree doesn't hold falls back to the loaded copy. */}
+                <PageTitle
+                  key={`title-${activeId}`}
+                  title={activeNode?.title ?? activePage.title}
+                  icon={activeNode?.icon ?? activePage.icon}
+                  autoFocus={focusTitleId === activeId}
+                  onAutoFocused={() => setFocusTitleId(null)}
+                  onRename={(title) => void renamePage(activePage.id, title)}
+                  onChangeIcon={(icon) => void changeIcon(activePage.id, icon)}
+                />
                 <Suspense fallback={<p className="hint">Loading…</p>}>
                   {activePage.kind === 'collection' ? (
                     <CollectionView
                       key={activeId}
                       page={activePage}
+                      childrenKey={(activeNode?.children ?? []).map((c) => `${c.id}:${c.title}:${c.icon}`).join('|')}
                       onOpenPage={openPage}
                       onCreatePage={handleCreatePage}
+                      onRenamePage={renamePage}
+                      onArchivePage={archivePage}
                     />
                   ) : activePage.kind === 'database' ? (
                     <DatabaseView

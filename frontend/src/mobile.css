@@ -335,7 +335,8 @@
   :root .teamspace-header .row-menu-btn,
   :root .sidebar-group-header .page-add-child,
   :root .sidebar-group-header .row-menu-btn,
-  :root .sidebar-section-label .page-add-child {
+  :root .sidebar-section-label .page-add-child,
+  :root .collection-item-menu-btn {
     width: 1.75rem;
     height: 1.75rem;
     opacity: 1;
@@ -377,8 +378,8 @@
   }
 
   /* iOS Safari zooms the page when a focused field's text is smaller
-     than 16px. The one field that is deliberately larger keeps its size. */
-  :root input:not([type='checkbox']):not([type='color']):not(.row-detail-title-input),
+     than 16px. The fields that are deliberately larger keep their size. */
+  :root input:not([type='checkbox']):not([type='color']):not(.row-detail-title-input):not(.page-title-field),
   :root textarea,
   :root select {
     font-size: 16px;
