@@ -379,6 +379,19 @@ export default function App() {
     })
   }
 
+  // Mouse drags in the tab bar (TabBar.tsx) know the exact slot the tab
+  // was dropped into, including after the last tab.
+  function moveTab(draggedId: string, toIndex: number) {
+    setOpenTabs((tabs) => {
+      const from = tabs.findIndex((t) => t.id === draggedId)
+      if (from === -1) return tabs
+      const next = [...tabs]
+      const [moved] = next.splice(from, 1)
+      next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, moved)
+      return next
+    })
+  }
+
   function closeTab(id: string) {
     setOpenTabs((tabs) => {
       const idx = tabs.findIndex((t) => t.id === id)
@@ -898,6 +911,7 @@ export default function App() {
             onSelectTab={setActiveId}
             onCloseTab={closeTab}
             onReorderTabs={reorderTabs}
+            onMoveTab={moveTab}
             sidebarCollapsed={sidebarHidden}
             onToggleSidebar={() =>
               isMobile ? setMobileSidebarOpen((o) => !o) : setSidebarCollapsed((c) => !c)

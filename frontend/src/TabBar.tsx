@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import PageIcon from './PageIcon'
 import Popover from './Popover'
 import './TabBar.css'
@@ -23,6 +23,7 @@ export default function TabBar({
   onSelectTab,
   onCloseTab,
   onReorderTabs,
+  onMoveTab,
   sidebarCollapsed,
   onToggleSidebar,
   userLabel,
@@ -37,6 +38,8 @@ export default function TabBar({
   onSelectTab: (id: string) => void
   onCloseTab: (id: string) => void
   onReorderTabs: (draggedId: string, targetId: string) => void
+  /** Mouse drag: put draggedId at index toIndex of the new order. */
+  onMoveTab: (draggedId: string, toIndex: number) => void
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
   userLabel: string
@@ -52,15 +55,29 @@ export default function TabBar({
   const pendingLabel = `${pendingApprovals} sign-up${pendingApprovals === 1 ? '' : 's'} awaiting approval`
   const [accountAnchor, setAccountAnchor] = useState<HTMLButtonElement | null>(null)
   // The whole tab is the drag source. With a mouse the drag is tracked
-  // with pointer events, not HTML5 drag-and-drop: in the macOS Dock web
-  // app (Safari "Add to Dock") tabs could be neither moved nor closed,
-  // while a normal browser tab worked. The native drag of a draggable
-  // tab is the part that differs between the two, and a press on the
-  // close button inside it can turn into that drag instead of a click.
-  // Pointer events behave the same in a browser tab and in a web app
-  // window. Touch keeps the HTML5 path (TOUCH_DRAG above).
+  // with pointer events, not HTML5 drag-and-drop, so it behaves the same
+  // in a browser tab and in the macOS Dock web app (where the native
+  // drag of a tab didn't work). The tab is picked up and follows the
+  // pointer along the bar, and the other tabs slide aside to open the
+  // slot it will land in, including the one after the last tab. Escape
+  // or a cancelled pointer puts it back. Touch keeps the HTML5 path
+  // (TOUCH_DRAG above), started by a long-press.
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null)
   const [dropTargetTabId, setDropTargetTabId] = useState<string | null>(null)
+  // The mouse drag in progress: which tab, how far it has moved (dx),
+  // where it started (from) and which slot it would land in (slot), and
+  // how far its neighbors move aside (shift: its width plus the gap).
+  const [lift, setLift] = useState<{ id: string; dx: number; from: number; slot: number; shift: number } | null>(
+    null,
+  )
+  // One render with no transitions, right after a drop: the tabs then
+  // swap their slide-aside offsets for their real new positions, which
+  // must not animate.
+  const [settling, setSettling] = useState(false)
+  // The dropped tab's on-screen left edge just before the drop; after
+  // the reorder renders it glides from there into its slot.
+  const settleFrom = useRef<{ id: string; left: number } | null>(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
   // Set when a mouse drag just ended, so the click that follows the
   // release doesn't also select the tab under the pointer.
   const suppressClick = useRef(false)
@@ -68,52 +85,146 @@ export default function TabBar({
 
   useEffect(() => () => stopPointerDrag.current?.(), [])
 
-  function tabIdAt(x: number, y: number): string | null {
-    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-tab-id]')
-    return el?.dataset.tabId ?? null
-  }
+  useEffect(() => {
+    if (!settling) return
+    const raf = requestAnimationFrame(() => setSettling(false))
+    return () => cancelAnimationFrame(raf)
+  }, [settling])
+
+  useLayoutEffect(() => {
+    const from = settleFrom.current
+    if (!from) return
+    settleFrom.current = null
+    const el = tabsRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(from.id)}"]`)
+    if (!el) return
+    const delta = from.left - el.getBoundingClientRect().left
+    if (Math.abs(delta) < 1 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    el.animate([{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }], {
+      duration: 180,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    })
+  })
 
   function handlePointerDown(tabId: string) {
-    return (e: React.PointerEvent) => {
+    return (e: React.PointerEvent<HTMLDivElement>) => {
       if (TOUCH_DRAG || e.pointerType === 'touch' || e.button !== 0) return
+      const container = tabsRef.current
+      if (!container) return
       const startX = e.clientX
       const startY = e.clientY
+      const pointerId = e.pointerId
+      const source = e.currentTarget
+      // Keeps the pointer's events coming to us even when it leaves the
+      // bar or the window mid-drag.
+      try {
+        source.setPointerCapture(pointerId)
+      } catch {
+        // Not supported: the window listeners below still work.
+      }
       let dragging = false
-      let target: string | null = null
+      let slots: { left: number; width: number }[] = []
+      let from = -1
+      let shift = 0
+      let barRect = container.getBoundingClientRect()
+      let startContentX = 0
+      let current: { dx: number; slot: number } = { dx: 0, slot: -1 }
+      let raf: number | null = null
       const body = document.body.style
       const prevSelect = body.userSelect
+      const prevCursor = body.cursor
+
+      const begin = () => {
+        barRect = container.getBoundingClientRect()
+        const els = Array.from(container.querySelectorAll<HTMLElement>('[data-tab-id]'))
+        slots = els.map((el) => {
+          const r = el.getBoundingClientRect()
+          return { left: r.left - barRect.left + container.scrollLeft, width: r.width }
+        })
+        from = els.findIndex((el) => el.dataset.tabId === tabId)
+        if (from === -1) return false
+        const gap = slots.length > 1 ? slots[1].left - (slots[0].left + slots[0].width) : 0
+        shift = slots[from].width + gap
+        startContentX = startX - barRect.left + container.scrollLeft
+        current = { dx: 0, slot: from }
+        body.userSelect = 'none'
+        body.cursor = 'grabbing'
+        setDraggedTabId(tabId)
+        return true
+      }
+
+      const update = (clientX: number) => {
+        // Holding the tab near either end of an overflowing bar scrolls it.
+        if (clientX < barRect.left + 24) container.scrollLeft -= 10
+        else if (clientX > barRect.right - 24) container.scrollLeft += 10
+        const contentX = clientX - barRect.left + container.scrollLeft
+        const me = slots[from]
+        const last = slots[slots.length - 1]
+        const rawDx = contentX - startContentX
+        // Drawn within the row of tabs, but the slot follows the pointer
+        // itself: pulled past either end, it is the first or last slot.
+        const dx = Math.min(Math.max(rawDx, -me.left), last.left + last.width - (me.left + me.width))
+        const center = me.left + me.width / 2 + rawDx
+        let slot = 0
+        slots.forEach((s, i) => {
+          if (i !== from && s.left + s.width / 2 < center) slot++
+        })
+        current = { dx, slot }
+        if (raf === null) {
+          raf = requestAnimationFrame(() => {
+            raf = null
+            setLift({ id: tabId, dx: current.dx, from, slot: current.slot, shift })
+          })
+        }
+      }
 
       const move = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
         if (!dragging) {
           if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
+          if (!begin()) {
+            stop()
+            return
+          }
           dragging = true
-          body.userSelect = 'none'
-          setDraggedTabId(tabId)
         }
-        const over = tabIdAt(ev.clientX, ev.clientY)
-        target = over && over !== tabId ? over : null
-        setDropTargetTabId(target)
+        update(ev.clientX)
       }
-      const end = (ev: PointerEvent) => {
+
+      const finish = (drop: boolean) => {
         stop()
         if (!dragging) return
         suppressClick.current = true
         // A click only follows a release over the same element; clear the
         // flag in case none comes.
         window.setTimeout(() => (suppressClick.current = false), 0)
-        if (ev.type === 'pointerup' && target) onReorderTabs(tabId, target)
+        if (drop && current.slot !== from) {
+          const el = container.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(tabId)}"]`)
+          if (el) settleFrom.current = { id: tabId, left: el.getBoundingClientRect().left }
+          setSettling(true)
+          onMoveTab(tabId, current.slot)
+        }
       }
-      const cancel = (ev: KeyboardEvent) => {
-        if (ev.key !== 'Escape') return
-        target = null
-        end(new PointerEvent('pointercancel'))
+      const up = (ev: PointerEvent) => {
+        if (ev.pointerId === pointerId) finish(ev.type === 'pointerup')
+      }
+      const key = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') finish(false)
       }
       const stop = () => {
+        if (raf !== null) cancelAnimationFrame(raf)
+        raf = null
         window.removeEventListener('pointermove', move)
-        window.removeEventListener('pointerup', end)
-        window.removeEventListener('pointercancel', end)
-        window.removeEventListener('keydown', cancel)
+        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointercancel', up)
+        window.removeEventListener('keydown', key)
+        try {
+          source.releasePointerCapture(pointerId)
+        } catch {
+          // Already released.
+        }
         body.userSelect = prevSelect
+        body.cursor = prevCursor
+        setLift(null)
         setDraggedTabId(null)
         setDropTargetTabId(null)
         stopPointerDrag.current = null
@@ -121,10 +232,20 @@ export default function TabBar({
       stopPointerDrag.current?.()
       stopPointerDrag.current = stop
       window.addEventListener('pointermove', move)
-      window.addEventListener('pointerup', end)
-      window.addEventListener('pointercancel', end)
-      window.addEventListener('keydown', cancel)
+      window.addEventListener('pointerup', up)
+      window.addEventListener('pointercancel', up)
+      window.addEventListener('keydown', key)
     }
+  }
+
+  // Where a tab is drawn during a mouse drag: the lifted one follows the
+  // pointer, the ones between its old and new slot move aside by its width.
+  function liftOffset(index: number, tabId: string): number {
+    if (!lift) return 0
+    if (tabId === lift.id) return lift.dx
+    if (index > lift.from && index <= lift.slot) return -lift.shift
+    if (index < lift.from && index >= lift.slot) return lift.shift
+    return 0
   }
 
   // HTML5 drag-and-drop, touch screens only (started by the polyfill).
@@ -190,22 +311,40 @@ export default function TabBar({
         </svg>
       </button>
 
-      <div className="tab-bar-tabs">
-        {tabs.map((tab) => (
+      <div
+        ref={tabsRef}
+        className={['tab-bar-tabs', lift && 'tab-bar-tabs-dragging', settling && 'tab-bar-tabs-settling']
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {tabs.map((tab, index) => (
           <div
             key={tab.id}
             className={[
               'tab',
               tab.id === activeId && 'active',
-              tab.id === draggedTabId && 'tab-dragging',
+              lift?.id === tab.id && 'tab-lifted',
+              !lift && tab.id === draggedTabId && 'tab-dragging',
               tab.id === dropTargetTabId && 'tab-drop-target',
             ]
               .filter(Boolean)
               .join(' ')}
+            style={
+              lift
+                ? {
+                    transform: `translateX(${liftOffset(index, tab.id)}px)${lift.id === tab.id ? ' scale(1.04)' : ''}`,
+                  }
+                : undefined
+            }
             data-tab-id={tab.id}
             onPointerDown={handlePointerDown(tab.id)}
+            // Text selection and the native drag of the icon would start
+            // on a mouse press and take the gesture over (Safari).
+            onMouseDown={(e) => {
+              if (!TOUCH_DRAG && e.button === 0) e.preventDefault()
+            }}
             draggable={TOUCH_DRAG || undefined}
-            onDragStart={TOUCH_DRAG ? handleDragStart(tab.id) : undefined}
+            onDragStart={TOUCH_DRAG ? handleDragStart(tab.id) : (e) => e.preventDefault()}
             onDragOver={TOUCH_DRAG ? handleDragOver(tab.id) : undefined}
             onDragLeave={TOUCH_DRAG ? () => setDropTargetTabId((cur) => (cur === tab.id ? null : cur)) : undefined}
             onDrop={TOUCH_DRAG ? handleDrop(tab.id) : undefined}
@@ -225,6 +364,7 @@ export default function TabBar({
               draggable={false}
               // Never the start of a tab drag: a press here is a close.
               onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation()
                 onCloseTab(tab.id)
