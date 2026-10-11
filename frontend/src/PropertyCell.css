@@ -310,3 +310,15 @@
   font-weight: 600;
 }
 
+
+/* A viewer's cell (PropertyCell readOnly): the fieldset disables every
+   control inside without adding a box of its own; values keep their color. */
+.cell-readonly {
+  display: contents;
+}
+
+.cell-readonly :disabled {
+  opacity: 1;
+  color: inherit;
+  cursor: default;
+}

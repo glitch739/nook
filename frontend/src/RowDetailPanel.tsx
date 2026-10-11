@@ -32,6 +32,7 @@ export default function RowDetailPanel({
   onChangeRowIcon,
   onPropertyChange,
   onOptionsChanged,
+  readOnly = false,
 }: {
   rowId: string
   title: string
@@ -50,6 +51,8 @@ export default function RowDetailPanel({
   onChangeRowIcon: (icon: string) => void
   onPropertyChange: (propertyId: string, value: unknown) => void
   onOptionsChanged: (propertyId: string, options: SelectOption[]) => void
+  /** A viewer: everything shown, nothing editable. */
+  readOnly?: boolean
 }) {
   const [page, setPage] = useState<Page | null>(null)
   const [draftTitle, setDraftTitle] = useState(title)
@@ -151,11 +154,12 @@ export default function RowDetailPanel({
       </div>
 
       <div className="row-detail-title-row">
-        <EditableIcon icon={icon} onChange={onChangeRowIcon} />
+        <EditableIcon icon={icon} onChange={onChangeRowIcon} readOnly={readOnly} />
         <input
           className="row-detail-title-input"
           value={draftTitle}
           placeholder="Untitled"
+          readOnly={readOnly}
           onChange={(e) => setDraftTitle(e.target.value)}
           onBlur={commitTitle}
           onKeyDown={(e) => {
@@ -173,6 +177,7 @@ export default function RowDetailPanel({
               value={values[prop.id]}
               onChange={(v) => onPropertyChange(prop.id, v)}
               onOptionsChanged={(options) => onOptionsChanged(prop.id, options)}
+              readOnly={readOnly}
             />
           </div>
         ))}

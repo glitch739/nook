@@ -49,16 +49,20 @@ const CodeBlock = CodeBlockLowlight.extend({
 function ToolbarButton({
   onClick,
   active,
+  disabled,
   children,
 }: {
   onClick: () => void
   active?: boolean
+  disabled?: boolean
   children: ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
       className={active ? 'toolbar-btn active' : 'toolbar-btn'}
     >
       {children}
@@ -241,68 +245,80 @@ function CollabEditor({ provider }: { provider: CollabProvider }) {
 
   return (
     <div className="editor-shell">
+      {/* Tiptap commands run even when the editor isn't editable, so the
+          buttons are disabled on read-only and not-yet-seeded pages. */}
       <div className="toolbar">
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive('bold')}
         >
           B
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           active={editor.isActive('italic')}
         >
           I
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleCode().run()}
           active={editor.isActive('code')}
         >
           <code className="toolbar-inline-code">`x`</code>
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor.isActive('heading', { level: 2 })}
         >
           H2
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           active={editor.isActive('bulletList')}
         >
           • List
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           active={editor.isActive('orderedList')}
         >
           1. List
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleTaskList().run()}
           active={editor.isActive('taskList')}
         >
           ☑ To-do
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           active={editor.isActive('blockquote')}
         >
           Quote
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           active={editor.isActive('codeBlock')}
         >
           Code
         </ToolbarButton>
         <ToolbarButton
+          disabled={!editable}
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
         >
           ▦ Table
         </ToolbarButton>
-        <ToolbarButton onClick={() => pickImages(editor)}>🖼 Image</ToolbarButton>
-        <ToolbarButton onClick={() => pickFiles(editor)}>📎 File</ToolbarButton>
+        <ToolbarButton disabled={!editable} onClick={() => pickImages(editor)}>🖼 Image</ToolbarButton>
+        <ToolbarButton disabled={!editable} onClick={() => pickFiles(editor)}>📎 File</ToolbarButton>
         <div className="collab-status">
           <div className="collab-peers">
             {peers.map((p) => (

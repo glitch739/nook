@@ -299,17 +299,23 @@ function DataTab() {
 function ProfileTab({ user, onUserChange }: { user: User; onUserChange: (u: User) => void }) {
   const [displayName, setDisplayName] = useState(user.display_name)
   const [email, setEmail] = useState(user.email)
+  const [password, setPassword] = useState('')
+  const emailChanged = email.trim().toLowerCase() !== user.email
   const flash = useFlash()
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
     flash.clear()
     try {
-      const changes: { display_name?: string; email?: string } = {}
+      const changes: { display_name?: string; email?: string; current_password?: string } = {}
       if (displayName.trim() !== user.display_name) changes.display_name = displayName.trim()
-      if (email.trim().toLowerCase() !== user.email) changes.email = email.trim()
-      if (!changes.display_name && changes.email === undefined) return
+      if (emailChanged) {
+        changes.email = email.trim()
+        changes.current_password = password
+      }
+      if (changes.display_name === undefined && changes.email === undefined) return
       const u = await updateMe(changes)
+      setPassword('')
       onUserChange(u)
       flash.ok(changes.email !== undefined ? 'Saved. We sent a confirmation link to the new address.' : 'Saved.')
     } catch (err) {
@@ -331,6 +337,18 @@ function ProfileTab({ user, onUserChange }: { user: User; onUserChange: (u: User
         Email address
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
+      {emailChanged && (
+        <label>
+          Current password (needed to change your email)
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+        </label>
+      )}
       {user.email && (
         <p className="hint">
           {user.email_verified ? (

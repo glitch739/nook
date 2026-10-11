@@ -39,7 +39,7 @@ export default function GroupMembersPopover({
   const [error, setError] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
   const [username, setUsername] = useState('')
-    const [role, setRole] = useState<GroupMember['role']>('editor')
+  const [role, setRole] = useState<GroupMember['role']>('editor')
 
   function reload() {
     listGroupMembers(groupId)

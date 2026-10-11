@@ -14,6 +14,7 @@ export default function PageTitle({
   onAutoFocused,
   onRename,
   onChangeIcon,
+  readOnly = false,
 }: {
   title: string
   icon: string
@@ -22,6 +23,8 @@ export default function PageTitle({
   onAutoFocused?: () => void
   onRename: (title: string) => void
   onChangeIcon: (icon: string) => void
+  /** A viewer sees the name and icon but can't change them. */
+  readOnly?: boolean
 }) {
   // null while not editing: the field then shows the saved name, so a
   // rename from elsewhere (the sidebar, another user) appears here too.
@@ -53,13 +56,14 @@ export default function PageTitle({
 
   return (
     <div className="page-title-bar">
-      <EditableIcon icon={icon} onChange={onChangeIcon} className="page-title-icon" iconClassName="page-title-glyph" />
+      <EditableIcon icon={icon} onChange={onChangeIcon} className="page-title-icon" iconClassName="page-title-glyph" readOnly={readOnly} />
       <input
         ref={inputRef}
         className="page-title-field"
         value={draft ?? title}
         placeholder="Untitled"
         aria-label="Page name"
+        readOnly={readOnly}
         spellCheck={false}
         onFocus={() => setDraft(title)}
         onChange={(e) => setDraft(e.target.value)}

@@ -15,6 +15,9 @@ import {
   reorderGroups as reorderGroupsApi,
   reorderPageSiblings as reorderPageSiblingsApi,
   reorderSpaces as reorderSpacesApi,
+  restoreGroup as restoreGroupApi,
+  restorePage as restorePageApi,
+  restoreSpace as restoreSpaceApi,
   updateGroup as updateGroupApi,
   updatePage as updatePageApi,
   updateSpace as updateSpaceApi,
@@ -24,6 +27,8 @@ import {
   type User,
 } from './api'
 import { urlTokens } from './urlTokens'
+import { notifyError, showToast } from './toast'
+import Toaster from './Toaster'
 import { setCollabUser } from './collabUser'
 import PageCover from './PageCover'
 import PageMeta from './PageMeta'
@@ -33,6 +38,7 @@ import RowPropertiesBar from './RowPropertiesBar'
 import Sidebar from './Sidebar'
 import TabBar, { type OpenTab } from './TabBar'
 import {
+  atLeast,
   collectPageIds,
   extractPage,
   findPage,
@@ -109,7 +115,8 @@ function preloadPageChunks() {
   else setTimeout(run, 1500)
 }
 
-type Status = 'checking' | 'anonymous' | 'authenticated'
+// unreachable: the server didn't answer (offline, or a proxy error).
+type Status = 'checking' | 'anonymous' | 'authenticated' | 'unreachable'
 
 const SIDEBAR_COLLAPSED_KEY = 'nook-sidebar-collapsed'
 
@@ -159,6 +166,8 @@ export default function App() {
   // and independent of the desktop collapse preference above.
   const isMobile = useIsMobile()
   const activeNode = activeId ? findPage(teamspaces, activeId) : null
+  // Viewers see pages read-only: the same editor+ check the server makes.
+  const activeReadOnly = !atLeast(teamspaces.find((t) => t.id === activePage?.space_id)?.role, 'editor')
 
   // Open tabs survive a refresh: kept per user in this browser and
   // restored once the sidebar tree has loaded, keeping only pages that
@@ -263,6 +272,15 @@ export default function App() {
     if (user) setCollabUser(user.id, user.display_name)
   }, [user])
 
+  const [bootAttempt, setBootAttempt] = useState(0)
+  // Unreachable at start: try again by itself as soon as the device is back online.
+  useEffect(() => {
+    if (status !== 'unreachable') return
+    const retry = () => setBootAttempt((n) => n + 1)
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [status])
+
   useEffect(() => {
     // An email-verification link (?verify=token) works whether or not
     // the person is logged in on this browser.
@@ -273,15 +291,22 @@ export default function App() {
           () => 'This verification link is invalid or has expired.',
         )
       : Promise.resolve(null)
-    Promise.all([me(), verified]).then(([u, notice]) => {
-      setUser(u)
-      setStatus(u ? 'authenticated' : 'anonymous')
-      if (notice) {
-        if (u) window.setTimeout(() => window.alert(notice), 0)
-        else setAuthNotice(notice)
-      }
-    })
-  }, [])
+    Promise.all([me(), verified]).then(
+      ([u, notice]) => {
+        setUser(u)
+        setStatus(u ? 'authenticated' : 'anonymous')
+        if (notice) {
+          if (u) showToast(notice)
+          else setAuthNotice(notice)
+        }
+      },
+      (e) => {
+        // Before this, a failed check left "Loading…" on screen forever.
+        console.error('session check failed', e)
+        setStatus('unreachable')
+      },
+    )
+  }, [bootAttempt])
 
   // Load the groups, spaces and page trees once authenticated (one
   // request, GET /api/sidebar).
@@ -294,7 +319,7 @@ export default function App() {
         setTeamspaces(ts)
         setGroups(gs)
       })
-      .catch((e) => console.error('failed to load the sidebar', e))
+      .catch((e) => notifyError('Could not load the sidebar', e))
       .finally(() => {
         if (!cancelled) setTeamspacesLoaded(true)
       })
@@ -317,7 +342,7 @@ export default function App() {
       .then((p) => {
         if (!cancelled) setActivePage(p)
       })
-      .catch((e) => console.error('failed to load page', e))
+      .catch((e) => notifyError('Could not load page', e))
     return () => {
       cancelled = true
     }
@@ -393,13 +418,20 @@ export default function App() {
   }
 
   function closeTab(id: string) {
+    closeTabs(new Set([id]))
+  }
+
+  // Closes every tab in ids; if the active one goes, its nearest
+  // surviving neighbor (right, else left) takes over. Reads the current
+  // activeId, not this render's, since callers may run after an await.
+  function closeTabs(ids: Set<string>) {
     setOpenTabs((tabs) => {
-      const idx = tabs.findIndex((t) => t.id === id)
-      const next = tabs.filter((t) => t.id !== id)
-      if (id === activeId) {
-        const fallback = next[idx] ?? next[idx - 1] ?? null
-        setActiveId(fallback ? fallback.id : null)
-      }
+      const next = tabs.filter((t) => !ids.has(t.id))
+      setActiveId((cur) => {
+        if (!cur || !ids.has(cur)) return cur
+        const kept = tabs.slice(0, tabs.findIndex((t) => t.id === cur)).filter((t) => !ids.has(t.id)).length
+        return (next[kept] ?? next[kept - 1])?.id ?? null
+      })
       return next
     })
   }
@@ -414,7 +446,7 @@ export default function App() {
       setFocusTitleId(page.id)
       setActiveId(page.id)
     } catch (e) {
-      console.error('failed to create page', e)
+      notifyError('Could not create page', e)
     }
   }
 
@@ -435,7 +467,7 @@ export default function App() {
       setTeamspaces((ts) => insertPage(ts, spaceId, databasePageId, node))
       return node
     } catch (e) {
-      console.error('failed to create row', e)
+      notifyError('Could not create row', e)
       return null
     }
   }
@@ -445,7 +477,7 @@ export default function App() {
       const space = await createSpaceApi(name, 'private', groupId)
       setTeamspaces((ts) => insertSpace(ts, space))
     } catch (e) {
-      console.error('failed to create space', e)
+      notifyError('Could not create space', e)
     }
   }
 
@@ -454,25 +486,29 @@ export default function App() {
       const group = await createGroupApi(name)
       setGroups((gs) => insertGroup(gs, group))
     } catch (e) {
-      console.error('failed to create group', e)
+      notifyError('Could not create group', e)
     }
   }
 
+  // Rename and icon handlers skip unchanged values: every blur of a rename field
+  // lands here, and each save is an API write plus a live refresh for everyone.
   async function renameGroup(id: string, name: string) {
+    if (groups.find((g) => g.id === id)?.name === name) return
     setGroups((gs) => updateGroupName(gs, id, name))
     try {
       await updateGroupApi(id, { name })
     } catch (e) {
-      console.error('failed to save group name', e)
+      notifyError('Could not save group name', e)
     }
   }
 
   async function changeGroupIcon(id: string, icon: string) {
+    if (groups.find((g) => g.id === id)?.icon === icon) return
     setGroups((gs) => updateGroupIcon(gs, id, icon))
     try {
       await updateGroupApi(id, { icon })
     } catch (e) {
-      console.error('failed to save group icon', e)
+      notifyError('Could not save group icon', e)
     }
   }
 
@@ -490,40 +526,40 @@ export default function App() {
     ids.splice(position === 'before' ? targetPos : targetPos + 1, 0, draggedId)
 
     setGroups((gs) => reorderSidebarGroups(gs, ids))
-    reorderGroupsApi(ids).catch((e) => console.error('failed to save group order', e))
+    reorderGroupsApi(ids).catch((e) => notifyError('Could not save group order', e))
   }
 
-  // Unlike archiveSpace, this can fail for a reason the user actually
-  // needs to see and act on (the group still has spaces in it,
-  // groups.Store.Archive's own refusal on the backend) rather than a
-  // background save that's fine to just log -- surfaced with alert()
-  // since there's no toast/notification system in this app to route it
-  // through instead.
+  // Can fail for a reason the user must act on (the group still has
+  // spaces in it, groups.Store.Archive's refusal); the toast says why.
   async function handleArchiveGroup(id: string) {
     try {
       await archiveGroupApi(id)
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to delete the group')
+      notifyError('Could not archive the group', e)
       return
     }
+    const group = groups.find((g) => g.id === id)
     setGroups((gs) => removeGroup(gs, id))
+    offerUndo(`Archived "${group?.name ?? 'group'}"`, () => restoreGroupApi(id))
   }
 
   async function renameSpace(id: string, name: string) {
+    if (teamspaces.find((s) => s.id === id)?.name === name) return
     setTeamspaces((ts) => updateSpaceName(ts, id, name))
     try {
       await updateSpaceApi(id, { name })
     } catch (e) {
-      console.error('failed to save space name', e)
+      notifyError('Could not save space name', e)
     }
   }
 
   async function changeSpaceIcon(id: string, icon: string) {
+    if (teamspaces.find((s) => s.id === id)?.icon === icon) return
     setTeamspaces((ts) => updateSpaceIcon(ts, id, icon))
     try {
       await updateSpaceApi(id, { icon })
     } catch (e) {
-      console.error('failed to save space icon', e)
+      notifyError('Could not save space icon', e)
     }
   }
 
@@ -559,7 +595,7 @@ export default function App() {
     ids.splice(position === 'before' ? targetPos : targetPos + 1, 0, draggedId)
 
     setTeamspaces((ts) => reorderTeamspaces(ts, ids))
-    reorderSpacesApi(ids).catch((e) => console.error('failed to save space order', e))
+    reorderSpacesApi(ids).catch((e) => notifyError('Could not save space order', e))
   }
 
   async function archiveSpace(id: string) {
@@ -567,43 +603,39 @@ export default function App() {
     try {
       await archiveSpaceApi(id)
     } catch (e) {
-      console.error('failed to archive space', e)
+      notifyError('Could not archive space', e)
       return
     }
     setTeamspaces((ts) => removeSpace(ts, id))
+    offerUndo(`Archived "${space?.name ?? 'space'}"`, () => restoreSpaceApi(id))
     if (!space) return
     // Every open tab that belonged to a page inside the archived space
     // is now pointing at something the sidebar can no longer reach --
     // close them the same way closeTab would, in one batch.
-    const idsToClose = new Set(collectPageIds(space.pages))
-    setOpenTabs((tabs) => {
-      const next = tabs.filter((t) => !idsToClose.has(t.id))
-      if (activeId && idsToClose.has(activeId)) {
-        setActiveId(next[0]?.id ?? null)
-      }
-      return next
-    })
+    closeTabs(new Set(collectPageIds(space.pages)))
   }
 
   async function renamePage(id: string, title: string) {
+    if (findPage(teamspaces, id)?.title === title) return
     setTeamspaces((ts) => updatePageInTree(ts, id, (p) => ({ ...p, title })))
     setOpenTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, title } : t)))
     if (activePage?.id === id) setActivePage({ ...activePage, title })
     try {
       await updatePageApi(id, { title })
     } catch (e) {
-      console.error('failed to save title', e)
+      notifyError('Could not save title', e)
     }
   }
 
   async function changeIcon(id: string, icon: string) {
+    if (findPage(teamspaces, id)?.icon === icon) return
     setTeamspaces((ts) => updatePageInTree(ts, id, (p) => ({ ...p, icon })))
     setOpenTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, icon } : t)))
     if (activePage?.id === id) setActivePage({ ...activePage, icon })
     try {
       await updatePageApi(id, { icon })
     } catch (e) {
-      console.error('failed to save icon', e)
+      notifyError('Could not save icon', e)
     }
   }
 
@@ -643,7 +675,9 @@ export default function App() {
   // The command palette's actions, built from the current state.
   function paletteActions(): PaletteAction[] {
     const activeSpace = activeId ? teamspaces.find((t) => findPage([t], activeId)) : undefined
-    const targetSpace = activeSpace ?? teamspaces[0]
+    // Only a space the user can add pages to.
+    const canAdd = (t: TeamSpace | undefined) => atLeast(t?.role, 'editor')
+    const targetSpace = canAdd(activeSpace) ? activeSpace : teamspaces.find(canAdd)
     const showSidebar = () => (isMobile ? setMobileSidebarOpen(true) : setSidebarCollapsed(false))
     const list: PaletteAction[] = []
     if (targetSpace) {
@@ -720,16 +754,35 @@ export default function App() {
   }
 
   async function archivePage(id: string) {
+    // Sub-pages are archived with it, so their tabs close too.
+    const node = findPage(teamspaces, id)
+    const ids = new Set(node ? collectPageIds([node]) : [id])
     try {
       await archivePageApi(id)
     } catch (e) {
-      console.error('failed to archive page', e)
+      notifyError('Could not archive page', e)
       return
     }
     setTeamspaces((ts) =>
       ts.map((space) => ({ ...space, pages: removePageFromTree(space.pages, id) })),
     )
-    closeTab(id)
+    closeTabs(ids)
+    offerUndo(`Archived "${node?.title || 'Untitled'}"`, () => restorePageApi(id))
+  }
+
+  // "Archived · Undo": restores through the archive API, then reloads the
+  // tree (a restore can bring back a whole subtree).
+  function offerUndo(text: string, restore: () => Promise<unknown>) {
+    showToast(text, {
+      action: {
+        label: 'Undo',
+        run: () =>
+          void restore().then(
+            () => reloadSidebar(),
+            (e) => notifyError('Could not undo', e),
+          ),
+      },
+    })
   }
 
   // Moves pageId to be the last child of (targetSpaceId,
@@ -741,11 +794,11 @@ export default function App() {
   // permission boundary) -- reusing extractPage/insertPage for both the
   // optimistic apply and, if the API call rejects it, putting the page
   // back exactly where findPageLocation said it started.
-  async function movePageTo(pageId: string, targetSpaceId: string, targetParentId: string | null) {
+  async function movePageTo(pageId: string, targetSpaceId: string, targetParentId: string | null): Promise<boolean> {
     const from = findPageLocation(teamspaces, pageId)
-    if (!from) return
+    if (!from) return false
     const { teamspaces: withoutPage, removed } = extractPage(teamspaces, pageId)
-    if (!removed) return
+    if (!removed) return false
 
     setTeamspaces(insertPage(withoutPage, targetSpaceId, targetParentId, removed))
     try {
@@ -755,8 +808,10 @@ export default function App() {
         const { teamspaces: reverted } = extractPage(ts, pageId)
         return insertPage(reverted, from.spaceId, from.parentId, removed)
       })
-      alert(e instanceof Error ? e.message : 'Failed to move the page')
+      notifyError('Could not move the page', e)
+      return false
     }
+    return true
   }
 
   // Places draggedId at the exact dropped position among
@@ -765,9 +820,7 @@ export default function App() {
   // landing at the end) if it isn't already one of those siblings, then
   // always following up with a precise reorderPageSiblings call so
   // "before/after a specific sibling" is exact regardless of whether a
-  // move happened first. Functional setTeamspaces throughout so the
-  // reorder step always computes from state *after* movePageTo's own
-  // update actually landed, not a stale snapshot from before it.
+  // move happened first.
   async function movePageToPosition(
     draggedId: string,
     targetSpaceId: string,
@@ -778,21 +831,17 @@ export default function App() {
     if (draggedId === targetId) return
     const from = findPageLocation(teamspaces, draggedId)
     const sameParent = from && from.spaceId === targetSpaceId && from.parentId === targetParentId
-    if (!sameParent) {
-      await movePageTo(draggedId, targetSpaceId, targetParentId)
-    }
+    if (!sameParent && !(await movePageTo(draggedId, targetSpaceId, targetParentId))) return
 
-    setTeamspaces((ts) => {
-      const siblings = siblingsOf(ts, targetSpaceId, targetParentId)
-      const ids = siblings.map((p) => p.id).filter((id) => id !== draggedId)
-      const targetIdx = ids.indexOf(targetId)
-      const insertAt = targetIdx === -1 ? ids.length : position === 'before' ? targetIdx : targetIdx + 1
-      ids.splice(insertAt, 0, draggedId)
-      reorderPageSiblingsApi(targetSpaceId, targetParentId, ids).catch((e) =>
-        console.error('failed to save page order', e),
-      )
-      return reorderPagesInTree(ts, targetSpaceId, targetParentId, ids)
-    })
+    // A move only appends draggedId, so the other siblings are the same
+    // before and after it.
+    const ids = siblingsOf(teamspaces, targetSpaceId, targetParentId)
+      .map((p) => p.id)
+      .filter((id) => id !== draggedId)
+    const targetIdx = ids.indexOf(targetId)
+    ids.splice(targetIdx === -1 ? ids.length : position === 'before' ? targetIdx : targetIdx + 1, 0, draggedId)
+    setTeamspaces((ts) => reorderPagesInTree(ts, targetSpaceId, targetParentId, ids))
+    reorderPageSiblingsApi(targetSpaceId, targetParentId, ids).catch((e) => notifyError('Could not save page order', e))
   }
 
   async function moveSpaceToGroup(spaceId: string, groupId: string) {
@@ -803,8 +852,27 @@ export default function App() {
       await moveSpaceToGroupApi(spaceId, groupId)
     } catch (e) {
       setTeamspaces((ts) => ts.map((t) => (t.id === spaceId ? { ...t, groupId: space.groupId } : t)))
-      alert(e instanceof Error ? e.message : 'Failed to move the space')
+      notifyError('Could not move the space', e)
     }
+  }
+
+  if (status === 'unreachable') {
+    return (
+      <div className="centered">
+        <div className="card auth-card">
+          <h1>Nook</h1>
+          <p className="auth-subtitle">
+            {navigator.onLine ? "Can't reach the server right now." : "You're offline."} Page text you edited but
+            that wasn't saved yet stays on this device and is sent once Nook is reachable again.
+          </p>
+          {/* A full reload, not just a re-check: behind Cloudflare Access an
+              expired login also lands here, and only a page load re-runs it. */}
+          <button type="button" className="settings-primary" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (status === 'checking') {
@@ -837,6 +905,7 @@ export default function App() {
   if (status === 'authenticated' && user) {
     return (
       <div className="app-shell">
+        <Toaster />
         {paletteOpen && (
           <CommandPalette
             teamspaces={teamspaces}
@@ -944,7 +1013,7 @@ export default function App() {
                 that window instead of racing it. */}
             {activeId && activePage && activePage.id === activeId ? (
               <>
-                <PageCover key={activeId} pageId={activePage.id} />
+                <PageCover key={activeId} pageId={activePage.id} readOnly={activeReadOnly} />
                 <PageMeta key={`meta-${activeId}`} page={activePage} meId={user.id} />
                 {/* The tree has the freshest name and icon (a rename in the
                     sidebar, or one by someone else arriving live); a page
@@ -954,6 +1023,7 @@ export default function App() {
                   title={activeNode?.title ?? activePage.title}
                   icon={activeNode?.icon ?? activePage.icon}
                   autoFocus={focusTitleId === activeId}
+                  readOnly={activeReadOnly}
                   onAutoFocused={() => setFocusTitleId(null)}
                   onRename={(title) => void renamePage(activePage.id, title)}
                   onChangeIcon={(icon) => void changeIcon(activePage.id, icon)}
@@ -963,6 +1033,7 @@ export default function App() {
                     <CollectionView
                       key={activeId}
                       page={activePage}
+                      readOnly={activeReadOnly}
                       childrenKey={(activeNode?.children ?? []).map((c) => `${c.id}:${c.title}:${c.icon}`).join('|')}
                       onOpenPage={openPage}
                       onCreatePage={handleCreatePage}
@@ -974,6 +1045,7 @@ export default function App() {
                       key={activeId}
                       pageId={activePage.id}
                       spaceId={activePage.space_id}
+                      readOnly={activeReadOnly}
                       teamspaces={teamspaces}
                       onCreateRow={handleCreateRow}
                       onArchiveRow={archivePage}
@@ -994,6 +1066,7 @@ export default function App() {
                             key={activeId}
                             rowId={activePage.id}
                             databasePageId={activePage.parent_page_id}
+                            readOnly={activeReadOnly}
                           />
                         )}
                       <Editor key={activeId} pageId={activePage.id} initialContent={activePage.content_json} />

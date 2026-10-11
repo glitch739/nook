@@ -633,6 +633,12 @@ func (s *Store) Move(ctx context.Context, pageID, newSpaceID string, newParentPa
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("pages: move: %w", db.ErrNotFound)
 	}
+	// Descendants follow the page: access is checked by each page's own space_id.
+	if _, err := tx.ExecContext(ctx, subtree+`
+		UPDATE pages SET space_id = ? WHERE id IN (SELECT id FROM sub);
+	`, pageID, newSpaceID); err != nil {
+		return fmt.Errorf("pages: move subtree: %w", err)
+	}
 	return tx.Commit()
 }
 

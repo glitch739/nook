@@ -30,7 +30,12 @@
   font-size: 0.875rem;
 }
 
-.toolbar-btn:hover {
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolbar-btn:hover:not(:disabled) {
   background: var(--surface-hover);
   box-shadow: var(--shadow-sm);
 }

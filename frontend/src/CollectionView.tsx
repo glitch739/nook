@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listCollectionItems, type CollectionItem, type PageKind } from './api'
+import { notifyError } from './toast'
 import { useLiveRefresh } from './liveEvents'
 import { endExternalPageDrag, startExternalPageDrag } from './pageDrag'
 import PageIcon from './PageIcon'
@@ -54,7 +55,10 @@ export default function CollectionView({
   onCreatePage,
   onRenamePage,
   onArchivePage,
+  readOnly = false,
 }: {
+  /** A viewer: the list opens pages, but nothing is created or changed. */
+  readOnly?: boolean
   page: { id: string; space_id: string; title: string; icon: string }
   /** The collection's children as the sidebar tree has them. It changes
    * when an item is renamed, archived, added, or dragged out, and the
@@ -81,7 +85,7 @@ export default function CollectionView({
       .then((list) => {
         if (!cancelled) setItems(list)
       })
-      .catch((e) => console.error('failed to load collection', e))
+      .catch((e) => notifyError('Could not load collection', e))
     return () => {
       cancelled = true
     }
@@ -174,6 +178,7 @@ export default function CollectionView({
         <button
           ref={newBtnRef}
           type="button"
+          hidden={readOnly}
           className="collection-new"
           onClick={() => setNewAnchor(newAnchor ? null : newBtnRef.current)}
         >
@@ -211,7 +216,7 @@ export default function CollectionView({
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                draggable={renamingId !== item.id}
+                draggable={!readOnly && renamingId !== item.id}
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = 'move'
                   e.dataTransfer.setData('text/plain', item.title || 'Untitled')
@@ -255,6 +260,7 @@ export default function CollectionView({
                 )}
                 <button
                   type="button"
+                  hidden={readOnly}
                   className="row-menu-btn collection-item-menu-btn"
                   aria-label={`More actions for ${item.title || 'Untitled'}`}
                   title="More actions"

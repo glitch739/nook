@@ -326,3 +326,25 @@ func TestPreferences(t *testing.T) {
 		t.Fatalf("array body = %d", code)
 	}
 }
+
+func TestEmailChangeNeedsPassword(t *testing.T) {
+	e := newTestEnv(t, RegOpen)
+	c := e.client()
+	e.do(t, c, "POST", "/api/auth/register", m{"email": "anna@example.hu", "username": "anna", "password": "hosszujelszo"}, nil)
+
+	if code := e.do(t, c, "PUT", "/api/me", m{"email": "thief@example.hu"}, nil); code != 403 {
+		t.Fatalf("email change without password = %d, want 403", code)
+	}
+	if code := e.do(t, c, "PUT", "/api/me", m{"email": "thief@example.hu", "current_password": "rossz-jelszo"}, nil); code != 403 {
+		t.Fatalf("email change with wrong password = %d, want 403", code)
+	}
+	if code := e.do(t, c, "PUT", "/api/me", m{"display_name": "Anna B"}, nil); code != 200 {
+		t.Fatalf("name change without password = %d, want 200", code)
+	}
+	var me struct {
+		Email string `json:"email"`
+	}
+	if code := e.do(t, c, "PUT", "/api/me", m{"email": "anna2@example.hu", "current_password": "hosszujelszo"}, &me); code != 200 || me.Email != "anna2@example.hu" {
+		t.Fatalf("email change with password = %d %q", code, me.Email)
+	}
+}

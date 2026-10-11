@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"net/http"
 	"testing"
 )
 
@@ -96,5 +97,48 @@ func TestSidebar(t *testing.T) {
 	// Signed out: no sidebar.
 	if code := e.do(t, e.client(), "GET", "/api/sidebar", nil, nil); code != 401 {
 		t.Fatalf("anonymous = %d", code)
+	}
+}
+
+// Each space and group carries the caller's own role, so the UI only
+// offers what the server will allow (a viewer gets no edit controls).
+func TestSidebarRoles(t *testing.T) {
+	e := newTestEnv(t, RegOpen)
+	alice, bob := e.client(), e.client()
+	e.do(t, alice, "POST", "/api/auth/register", m{"email": "alice@example.hu", "username": "alice", "password": "hosszujelszo"}, nil)
+	e.do(t, bob, "POST", "/api/auth/register", m{"email": "bob@example.hu", "username": "bob", "password": "hosszujelszo"}, nil)
+
+	var g, sp idResp
+	e.do(t, alice, "POST", "/api/groups", m{"name": "Work"}, &g)
+	e.do(t, alice, "POST", "/api/spaces", m{"name": "Notes", "type": "private", "group_id": g.ID}, &sp)
+	if code := e.do(t, alice, "POST", "/api/groups/"+g.ID+"/members", m{"username": "bob", "role": "viewer"}, nil); code != 201 && code != 200 {
+		t.Fatalf("add bob = %d", code)
+	}
+
+	type withRole struct {
+		ID   string `json:"id"`
+		Role string `json:"role"`
+	}
+	roles := func(c *http.Client) (map[string]string, map[string]string) {
+		var got struct {
+			Groups []withRole `json:"groups"`
+			Spaces []withRole `json:"spaces"`
+		}
+		e.do(t, c, "GET", "/api/sidebar", nil, &got)
+		gs, ss := map[string]string{}, map[string]string{}
+		for _, x := range got.Groups {
+			gs[x.ID] = x.Role
+		}
+		for _, x := range got.Spaces {
+			ss[x.ID] = x.Role
+		}
+		return gs, ss
+	}
+
+	if gs, ss := roles(alice); gs[g.ID] != "owner" || ss[sp.ID] != "owner" {
+		t.Fatalf("alice roles: group %q space %q", gs[g.ID], ss[sp.ID])
+	}
+	if gs, ss := roles(bob); gs[g.ID] != "viewer" || ss[sp.ID] != "viewer" {
+		t.Fatalf("bob roles: group %q space %q", gs[g.ID], ss[sp.ID])
 	}
 }

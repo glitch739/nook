@@ -3,6 +3,7 @@ import Image from '@tiptap/extension-image'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { uploadPageAttachment, uploadPageImage } from './api'
+import { showToast } from './toast'
 import { ATTACHMENT_EXTENSIONS, MAX_ATTACHMENT_BYTES, extensionOf } from './fileAttachment'
 
 // Images are scaled down to this width before upload. The editor column
@@ -106,7 +107,7 @@ export function uploadImages(editor: Editor, pageId: string, files: File[], pos?
           .run()
       } catch (err) {
         if (!editor.isDestroyed) view.dispatch(view.state.tr.setMeta(placeholderKey, { remove: { id } }))
-        alert(`Image upload failed: ${err instanceof Error ? err.message : err}`)
+        showToast(`Image upload failed: ${err instanceof Error ? err.message : err}`, { error: true })
       }
     })()
   }
@@ -119,11 +120,11 @@ export function uploadAttachments(editor: Editor, pageId: string, files: File[],
   const view: EditorView = editor.view
   for (const file of files) {
     if (!ATTACHMENT_EXTENSIONS.includes(extensionOf(file.name))) {
-      alert(`"${file.name}" can't be attached. Allowed: ${ATTACHMENT_EXTENSIONS.join(', ')}.`)
+      showToast(`"${file.name}" can't be attached. Allowed: ${ATTACHMENT_EXTENSIONS.join(', ')}.`, { error: true })
       continue
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      alert(`"${file.name}" is larger than 25 MB.`)
+      showToast(`"${file.name}" is larger than 25 MB.`, { error: true })
       continue
     }
     const id = {}
@@ -144,7 +145,7 @@ export function uploadAttachments(editor: Editor, pageId: string, files: File[],
           .run()
       } catch (err) {
         if (!editor.isDestroyed) view.dispatch(view.state.tr.setMeta(placeholderKey, { remove: { id } }))
-        alert(`Upload failed: ${err instanceof Error ? err.message : err}`)
+        showToast(`Upload failed: ${err instanceof Error ? err.message : err}`, { error: true })
       }
     })()
   }

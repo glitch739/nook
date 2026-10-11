@@ -34,11 +34,13 @@ const (
 	msgAwareness = 2
 )
 
+// pingEvery also paces the access re-check; a var so tests can shorten it.
+var pingEvery = 25 * time.Second
+
 const (
 	maxMessage   = 16 << 20
 	sendQueue    = 512
 	writeTimeout = 10 * time.Second
-	pingEvery    = 25 * time.Second
 	// activityEvery throttles "user edited page" activity writes per connection.
 	activityEvery = time.Minute
 )
@@ -151,7 +153,9 @@ func (h *Hub) leave(r *room, c *conn) {
 
 // Serve runs one client connection for pageID until it closes. The
 // caller has already authenticated the user and checked access.
-func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, pageID, userID string, readonly bool) {
+// allowed, if non-nil, is re-checked on every ping; false closes the
+// connection (access revoked, account disabled, page archived, ...).
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, pageID, userID string, readonly bool, allowed func(context.Context) bool) {
 	ws, err := websocket.Accept(w, r, nil) // default: same-origin only
 	if err != nil {
 		return
@@ -183,6 +187,10 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, pageID, userID strin
 					return
 				}
 			case <-t.C:
+				if allowed != nil && !allowed(ctx) {
+					c.close()
+					return
+				}
 				pctx, pc := context.WithTimeout(ctx, writeTimeout)
 				err := ws.Ping(pctx)
 				pc()

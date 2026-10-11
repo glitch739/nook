@@ -328,3 +328,32 @@ func TestCanAccessGroup_UnknownGroupIsDeniedNotError(t *testing.T) {
 		t.Fatal("access to a nonexistent group should be denied, not granted")
 	}
 }
+
+// SpaceRole is the stronger of the direct and the group role, "" without access.
+func TestSpaceRole(t *testing.T) {
+	conn := dbtest.New(t)
+	ctx := context.Background()
+	userStore := users.NewStore(conn)
+	owner, _ := userStore.Create(ctx, "alice", "hash", "Alice")
+	viewer, _ := userStore.Create(ctx, "bob", "hash", "Bob")
+	stranger, _ := userStore.Create(ctx, "carol", "hash", "Carol")
+	groupStore := groups.NewStore(conn)
+	group, err := groupStore.Create(ctx, "G", owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := groupStore.AddMember(ctx, group.ID, viewer.ID, groups.RoleViewer); err != nil {
+		t.Fatal(err)
+	}
+	space, err := spaces.NewStore(conn).Create(ctx, "S", spaces.TypeShared, owner.ID, group.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := NewChecker(conn)
+	for _, tc := range []struct{ user, want string }{{owner.ID, "owner"}, {viewer.ID, "viewer"}, {stranger.ID, ""}} {
+		got, err := c.SpaceRole(ctx, tc.user, space.ID)
+		if err != nil || got != tc.want {
+			t.Fatalf("SpaceRole(%s) = %q, %v; want %q", tc.user, got, err, tc.want)
+		}
+	}
+}

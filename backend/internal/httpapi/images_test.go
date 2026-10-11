@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"testing"
 )
 
@@ -76,5 +77,43 @@ func TestPageImages(t *testing.T) {
 	}
 	if resp, _ := e.client().Get(e.srv.URL + img.URL); resp.StatusCode != 401 {
 		t.Fatalf("anonymous read = %d", resp.StatusCode)
+	}
+}
+
+// A cover's type comes from its bytes, not the label the client sends.
+func TestCoverTypeFromBytes(t *testing.T) {
+	e := newTestEnv(t, RegOpen)
+	anna := e.client()
+	e.do(t, anna, "POST", "/api/auth/register", m{"email": "anna@example.hu", "username": "anna", "password": "hosszujelszo"}, nil)
+	var spaces []spaceResponse
+	e.do(t, anna, "GET", "/api/spaces", nil, &spaces)
+	var page pageResponse
+	e.do(t, anna, "POST", "/api/spaces/"+spaces[0].ID+"/pages", m{"title": "P"}, &page)
+
+	upload := func(data []byte) (int, coverResponse) {
+		var body bytes.Buffer
+		mw := multipart.NewWriter(&body)
+		h := textproto.MIMEHeader{}
+		h.Set("Content-Disposition", `form-data; name="file"; filename="c.png"`)
+		h.Set("Content-Type", "image/png")
+		fw, _ := mw.CreatePart(h)
+		fw.Write(data)
+		mw.Close()
+		req, _ := http.NewRequest("PUT", e.srv.URL+"/api/pages/"+page.ID+"/cover", &body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		resp, err := anna.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out coverResponse
+		json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	if code, _ := upload([]byte("<html><script>alert(1)</script>")); code != 400 {
+		t.Fatalf("HTML labelled image/png = %d, want 400", code)
+	}
+	if code, c := upload(testPNG); code != 200 || c.MimeType != "image/png" || c.SizeBytes != int64(len(testPNG)) {
+		t.Fatalf("real PNG = %d %+v", code, c)
 	}
 }

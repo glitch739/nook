@@ -58,7 +58,7 @@ export default function CodeBlockView({ node, updateAttributes, editor }: NodeVi
   return (
     <NodeViewWrapper className="code-block-view">
       <div className="code-block-header" contentEditable={false} ref={rootRef}>
-        <button type="button" className="code-lang-btn" onClick={() => setOpen((v) => !v)}>
+        <button type="button" className="code-lang-btn" onClick={() => editor.isEditable && setOpen((v) => !v)}>
           {current.label}
           <span className="code-lang-chevron">▾</span>
         </button>

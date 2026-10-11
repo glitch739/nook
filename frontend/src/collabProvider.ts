@@ -8,12 +8,15 @@
 //   * a provider whose editor unmounted stays alive until everything is
 //     acked (and keeps reconnecting while offline);
 //   * leaving the browser tab with unacked changes triggers the
-//     browser's "leave page?" warning.
+//     browser's "leave page?" warning;
+//   * unacked changes are also kept in IndexedDB (offlineEdits.ts) and
+//     resent the next time the page opens, after a reload or a crash.
 import type { Schema } from '@tiptap/pm/model'
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as Y from 'yjs'
-import { getCollabUser, onCollabUserChange } from './collabUser'
+import { getCollabUser, getCollabUserId, onCollabUserChange } from './collabUser'
+import { loadOfflineEdits, saveOfflineEdits } from './offlineEdits'
 
 const MSG_UPDATE = 1
 const MSG_AWARENESS = 2
@@ -73,14 +76,31 @@ export class CollabProvider {
   private listeners = new Set<() => void>()
 
   readonly pageId: string
+  private readonly offlineKey: string
 
   constructor(pageId: string, initialContent: string) {
     this.pageId = pageId
+    this.offlineKey = `${getCollabUserId()}:${pageId}`
     this.initialContent = initialContent
     this.doc.on('update', this.onDocUpdate)
     this.awareness.on('update', this.onAwarenessUpdate)
     this.awareness.setLocalStateField('user', getCollabUser())
-    this.connect()
+    // Edits a previous visit never got acked come back first, as pending,
+    // so the first sync resends them.
+    void loadOfflineEdits(this.offlineKey).then((saved) => {
+      if (this.doc.isDestroyed) return
+      if (saved) {
+        Y.applyUpdate(this.doc, saved, this)
+        this.pending.unshift(saved)
+      }
+      this.connect()
+    })
+  }
+
+  // Mirrors pending + outbox into IndexedDB (or clears it once all acked).
+  private persist() {
+    const all = [...this.pending, ...this.outbox]
+    saveOfflineEdits(this.offlineKey, all.length ? Y.mergeUpdates(all) : null)
   }
 
   // ---- subscription (React) ----
@@ -163,6 +183,7 @@ export class CollabProvider {
           break
         case 'ack':
           this.pending.shift()
+          this.persist()
           this.lastSeq = Math.max(this.lastSeq, m.seq)
           this.scheduleSnapshot()
           if (this.closing && !this.hasUnsaved) this.finishClosing()
@@ -217,12 +238,14 @@ export class CollabProvider {
     const merged = Y.mergeUpdates(this.outbox)
     this.outbox = []
     this.pending.push(merged)
+    this.persist()
     if (this.synced) this.sendRaw(frame(MSG_UPDATE, merged))
   }
 
   private resendPending() {
     if (this.readonly) {
       this.pending = []
+      this.persist()
       return
     }
     if (this.pending.length === 0) return

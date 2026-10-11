@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"nook/internal/auth"
 	"nook/internal/collab"
@@ -14,6 +16,7 @@ type collabAPI struct {
 	hub   *collab.Hub
 	pages *pages.Store
 	perm  *permissions.Checker
+	auth  *auth.Handler
 }
 
 // collabHandler: GET /api/pages/{pageID}/collab, upgraded to a WebSocket
@@ -35,5 +38,34 @@ func (a collabAPI) collabHandler(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	a.hub.Serve(w, r, page.ID, userID, !canEdit)
+	cookie, err := r.Cookie(auth.SessionCookieName)
+	if err != nil { // RequireAuth already passed, so this can't happen
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	a.hub.Serve(w, r, page.ID, userID, !canEdit, a.stillAllowed(cookie.Value, userID, page.ID, canEdit))
+}
+
+// stillAllowed re-checks, for an open connection, everything collabHandler
+// checked when it opened: session, account, page, and the same role. Any
+// failure (errors included) closes it; the client reconnects and gets
+// whatever access it has now.
+func (a collabAPI) stillAllowed(token, userID, pageID string, canEdit bool) func(context.Context) bool {
+	role := spaces.RoleViewer
+	if canEdit {
+		role = spaces.RoleEditor
+	}
+	return func(ctx context.Context) bool {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if _, u, ok := a.auth.ActiveSession(ctx, token); !ok || u.ID != userID {
+			return false
+		}
+		page, err := a.pages.GetMetaByID(ctx, pageID)
+		if err != nil || page.ArchivedAt != nil {
+			return false
+		}
+		ok, err := a.perm.CanAccessSpace(ctx, userID, page.SpaceID, role)
+		return err == nil && ok
+	}
 }

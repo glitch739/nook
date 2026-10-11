@@ -58,6 +58,7 @@ type Group struct {
 type UserGroup struct {
 	Group
 	Position string
+	Role     string // the user's own role in this group
 }
 
 // Member is one group_members row joined with the user's own public
@@ -155,7 +156,7 @@ func (s *Store) Create(ctx context.Context, name, ownerID string) (Group, error)
 // in that user's own chosen order (ReorderForUser).
 func (s *Store) ListForUser(ctx context.Context, userID string) ([]UserGroup, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT g.id, g.name, g.icon, g.owner_id, g.archived_at, g.created_at, gm.position
+		SELECT g.id, g.name, g.icon, g.owner_id, g.archived_at, g.created_at, gm.position, gm.role
 		FROM groups AS g
 		JOIN group_members AS gm ON gm.group_id = g.id
 		WHERE gm.user_id = ? AND g.archived_at IS NULL
@@ -170,7 +171,7 @@ func (s *Store) ListForUser(ctx context.Context, userID string) ([]UserGroup, er
 	for rows.Next() {
 		var ug UserGroup
 		if err := rows.Scan(
-			&ug.ID, &ug.Name, &ug.Icon, &ug.OwnerID, &ug.ArchivedAt, &ug.CreatedAt, &ug.Position,
+			&ug.ID, &ug.Name, &ug.Icon, &ug.OwnerID, &ug.ArchivedAt, &ug.CreatedAt, &ug.Position, &ug.Role,
 		); err != nil {
 			return nil, fmt.Errorf("groups: scan group: %w", err)
 		}

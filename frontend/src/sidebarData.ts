@@ -3,7 +3,7 @@
 // to be a static mock; loadTeamspaces() below now builds the same shape
 // from real data.
 
-import { getSidebar, type Group, type PageKind, type Space, type TreeNode } from './api'
+import { getSidebar, type Group, type GroupMember, type PageKind, type Space, type TreeNode } from './api'
 
 export interface PageNode {
   id: string
@@ -25,6 +25,7 @@ export interface TeamSpace {
   // (findPage, updatePage, insertPage, ...) keeps working over a flat
   // TeamSpace[] unchanged.
   groupId: string
+  role: Role // the current user's effective role in this space
   pages: PageNode[]
 }
 
@@ -34,6 +35,15 @@ export interface SidebarGroup {
   id: string
   name: string
   icon: string
+  role: Role // the current user's role in this group
+}
+
+export type Role = GroupMember['role']
+const ROLE_RANK: Record<Role, number> = { viewer: 1, editor: 2, admin: 3, owner: 4 }
+
+/** Whether role is at least min -- the same ranking the server enforces. */
+export function atLeast(role: Role | undefined, min: Role): boolean {
+  return role !== undefined && ROLE_RANK[role] >= ROLE_RANK[min]
 }
 
 function toPageNode(node: TreeNode): PageNode {
@@ -57,9 +67,10 @@ export async function loadSidebar(): Promise<{ teamspaces: TeamSpace[]; groups: 
       icon: space.icon,
       type: space.type,
       groupId: space.group_id,
+      role: space.role,
       pages: space.pages.map(toPageNode),
     })),
-    groups: data.groups.map((g) => ({ id: g.id, name: g.name, icon: g.icon })),
+    groups: data.groups.map((g) => ({ id: g.id, name: g.name, icon: g.icon, role: g.role })),
   }
 }
 
@@ -68,14 +79,15 @@ export async function loadSidebar(): Promise<{ teamspaces: TeamSpace[]; groups: 
 export function insertSpace(teamspaces: TeamSpace[], space: Space): TeamSpace[] {
   return [
     ...teamspaces,
-    { id: space.id, name: space.name, icon: space.icon, type: space.type, groupId: space.group_id, pages: [] },
+    // The creator owns a new space.
+    { id: space.id, name: space.name, icon: space.icon, type: space.type, groupId: space.group_id, role: 'owner', pages: [] },
   ]
 }
 
 /** Immutably appends a newly created group, for an optimistic sidebar
  * update right after a successful createGroup() call. */
 export function insertGroup(groups: SidebarGroup[], group: Group): SidebarGroup[] {
-  return [...groups, { id: group.id, name: group.name, icon: group.icon }]
+  return [...groups, { id: group.id, name: group.name, icon: group.icon, role: 'owner' }]
 }
 
 /** Immutably updates one group's icon, mirroring updateSpaceIcon. */
@@ -249,7 +261,8 @@ export function reorderPagesInTree(
 ): TeamSpace[] {
   function reorderList(pages: PageNode[]): PageNode[] {
     const byId = new Map(pages.map((p) => [p.id, p]))
-    return ids.map((id) => byId.get(id)!)
+    // An id that isn't a sibling (a live reload got there first) is skipped, never undefined.
+    return ids.flatMap((id) => byId.get(id) ?? [])
   }
   return teamspaces.map((space) => {
     if (space.id !== spaceId) return space

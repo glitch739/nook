@@ -70,7 +70,10 @@ func (a coversAPI) uploadCoverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	contentType := header.Header.Get("Content-Type")
+	// The bytes decide the type, not the client's label (same as AddImage).
+	head := make([]byte, 512)
+	n, _ := file.ReadAt(head, 0)
+	contentType := http.DetectContentType(head[:n])
 	if !assets.IsAllowedMimeType(contentType) {
 		http.Error(w, "unsupported file type -- PNG, JPEG, WEBP, or GIF only", http.StatusBadRequest)
 		return

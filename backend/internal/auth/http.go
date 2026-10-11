@@ -239,14 +239,8 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		session, err := h.Sessions.Get(r.Context(), cookie.Value)
-		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		user, err := h.Users.GetByID(r.Context(), session.UserID)
-		if err != nil || user.Status != users.StatusActive {
+		session, user, ok := h.ActiveSession(r.Context(), cookie.Value)
+		if !ok {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -256,6 +250,21 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, isAdminContextKey, user.IsAdmin)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// ActiveSession resolves a session cookie token to its session and user,
+// ok=false unless the session is valid and the account active. Also used
+// to re-check long-lived connections that outlive their opening request.
+func (h *Handler) ActiveSession(ctx context.Context, token string) (Session, users.User, bool) {
+	session, err := h.Sessions.Get(ctx, token)
+	if err != nil {
+		return Session{}, users.User{}, false
+	}
+	user, err := h.Users.GetByID(ctx, session.UserID)
+	if err != nil || user.Status != users.StatusActive {
+		return Session{}, users.User{}, false
+	}
+	return session, user, true
 }
 
 // RequireAdmin is RequireAuth plus "must be an instance admin".

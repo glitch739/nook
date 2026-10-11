@@ -5,7 +5,7 @@ import PageIcon from './PageIcon'
 import { downloadUrl } from './download'
 import { DEFAULT_COLLECTION_ICON, DEFAULT_DATABASE_ICON, DEFAULT_ICON, iconColorAttr } from './pageIcon'
 import Popover from './Popover'
-import { findPage, type PageNode, type SidebarGroup, type TeamSpace } from './sidebarData'
+import { atLeast, findPage, type PageNode, type SidebarGroup, type TeamSpace } from './sidebarData'
 import SidebarSearch from './SidebarSearch'
 import Collapse from './Collapse'
 import { usePresence } from './usePresence'
@@ -403,6 +403,8 @@ function Teamspace({
   onOpenMoveTo: (pageId: string, anchorEl: HTMLElement) => void
 }) {
   const moves = useContext(SidebarMovesContext)
+  // Viewers get no edit controls: the server would refuse them anyway.
+  const canEdit = atLeast(space.role, 'editor')
   const [expanded, setExpanded] = useState(true)
   // See PageTreeItem's identical pattern for why this is a ref-holding
   // piece of state rather than reading iconRef.current during render.
@@ -485,10 +487,10 @@ function Teamspace({
         </span>
         <span
           ref={iconRef}
-          className="page-icon-editable"
+          className={canEdit ? 'page-icon-editable' : undefined}
           onClick={(e) => {
             e.stopPropagation()
-            setPickerAnchor(iconRef.current)
+            if (canEdit) setPickerAnchor(iconRef.current)
           }}
         >
           <PageIcon icon={space.icon} className="page-icon" />
@@ -522,39 +524,51 @@ function Teamspace({
           <span
             className="teamspace-name"
             onDoubleClick={() => {
+              if (!canEdit) return
               setDraftName(space.name)
               setRenaming(true)
             }}
-            title="Double-click to rename"
+            title={canEdit ? 'Double-click to rename' : undefined}
           >
             {space.name}
           </span>
         )}
-        <CreatePageButton
-          spaceId={space.id}
-          parentId={null}
-          onCreatePage={onCreatePage}
-          label="Create a new page/database"
-        />
+        {canEdit && (
+          <CreatePageButton
+            spaceId={space.id}
+            parentId={null}
+            onCreatePage={onCreatePage}
+            label="Create a new page/database"
+          />
+        )}
         <RowMenu
           items={[
-            {
-              label: 'Rename',
-              onClick: () => {
-                setDraftName(space.name)
-                setRenaming(true)
-              },
-            },
+            ...(canEdit
+              ? [
+                  {
+                    label: 'Rename',
+                    onClick: () => {
+                      setDraftName(space.name)
+                      setRenaming(true)
+                    },
+                  },
+                ]
+              : []),
+            // Space order is the user's own, so even a viewer can move it.
             ...(moves ? moveItems(prevId, nextId, (target, pos) => moves.moveSpace(space.id, target, pos)) : []),
-            {
-              label: 'Delete',
-              danger: true,
-              onClick: () => {
-                if (window.confirm(`Delete "${space.name}"? Every page inside it will disappear from the list too.`)) {
-                  onArchiveSpace(space.id)
-                }
-              },
-            },
+            ...(atLeast(space.role, 'owner')
+              ? [
+                  {
+                    label: 'Archive',
+                    danger: true,
+                    onClick: () => {
+                      if (window.confirm(`Archive "${space.name}"? Its pages go with it. You can restore it from the Archive.`)) {
+                        onArchiveSpace(space.id)
+                      }
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       </div>
@@ -564,6 +578,7 @@ function Teamspace({
           depth={0}
           spaceId={space.id}
           parentId={null}
+          canEdit={canEdit}
           activeId={activeId}
           onSelect={onSelect}
           onRenamePage={onRenamePage}
@@ -679,6 +694,8 @@ function GroupSection({
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [membersAnchor, setMembersAnchor] = useState<HTMLElement | null>(null)
   const [creatingSpace, setCreatingSpace] = useState(false)
+  // Same roles the server checks: admin to rename, editor to add a space.
+  const canAdmin = atLeast(group.role, 'admin')
 
   useEffect(() => {
     if (renaming) {
@@ -738,11 +755,11 @@ function GroupSection({
         </span>
         <span
           ref={iconRef}
-          className="page-icon-editable group-icon-badge"
+          className={canAdmin ? 'page-icon-editable group-icon-badge' : 'group-icon-badge'}
           data-icon-color={iconColorAttr(group.icon)}
           onClick={(e) => {
             e.stopPropagation()
-            setPickerAnchor(iconRef.current)
+            if (canAdmin) setPickerAnchor(iconRef.current)
           }}
         >
           <PageIcon icon={group.icon} className="page-icon" />
@@ -776,10 +793,11 @@ function GroupSection({
           <span
             className="sidebar-group-name"
             onDoubleClick={() => {
+              if (!canAdmin) return
               setDraftName(group.name)
               setRenaming(true)
             }}
-            title="Double-click to rename"
+            title={canAdmin ? 'Double-click to rename' : undefined}
           >
             {group.name}
           </span>
@@ -789,44 +807,54 @@ function GroupSection({
             <GroupMembersPopover groupId={group.id} anchorEl={membersAnchor} onClose={() => setMembersAnchor(null)} />
           </Suspense>
         )}
-        <button
-          className="page-add-child"
-          onClick={(e) => {
-            e.stopPropagation()
-            setCreatingSpace(true)
-          }}
-          title="Create a new space"
-          aria-label="Create a new space"
-        >
-          +
-        </button>
+        {atLeast(group.role, 'editor') && (
+          <button
+            className="page-add-child"
+            onClick={(e) => {
+              e.stopPropagation()
+              setCreatingSpace(true)
+            }}
+            title="Create a new space"
+            aria-label="Create a new space"
+          >
+            +
+          </button>
+        )}
         <RowMenu
           items={[
             {
               label: 'Group members',
               onClick: (anchorEl) => setMembersAnchor(anchorEl),
             },
-            {
-              label: 'Rename',
-              onClick: () => {
-                setDraftName(group.name)
-                setRenaming(true)
-              },
-            },
+            ...(canAdmin
+              ? [
+                  {
+                    label: 'Rename',
+                    onClick: () => {
+                      setDraftName(group.name)
+                      setRenaming(true)
+                    },
+                  },
+                ]
+              : []),
             ...(moves ? moveItems(prevId, nextId, (target, pos) => moves.moveGroup(group.id, target, pos)) : []),
-            {
-              label: 'Delete',
-              danger: true,
-              onClick: () => {
-                if (
-                  window.confirm(
-                    `Delete "${group.name}"? This only works when the group has no spaces left in it -- delete or move them first.`,
-                  )
-                ) {
-                  onArchiveGroup(group.id)
-                }
-              },
-            },
+            ...(atLeast(group.role, 'owner')
+              ? [
+                  {
+                    label: 'Archive',
+                    danger: true,
+                    onClick: () => {
+                      if (
+                        window.confirm(
+                          `Archive "${group.name}"? This only works when the group has no spaces left in it -- archive or move them first. You can restore it from the Archive.`,
+                        )
+                      ) {
+                        onArchiveGroup(group.id)
+                      }
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       </div>
@@ -888,6 +916,8 @@ interface PageTreeProps {
   // page id one level in. Needed (not derivable from pages alone) so a
   // reorder/move call knows which sibling group it's actually scoped to.
   parentId: string | null
+  // Editor or better in this space: viewers get no edit controls.
+  canEdit: boolean
   activeId: string | null
   onSelect: (id: string) => void
   onRenamePage: (id: string, title: string) => void
@@ -925,6 +955,7 @@ function PageTreeItem({
   depth,
   spaceId,
   parentId,
+  canEdit,
   activeId,
   onSelect,
   onRenamePage,
@@ -995,7 +1026,7 @@ function PageTreeItem({
         onDragOver={drag.onDragOver}
         onDragLeave={drag.onDragLeave}
         onDrop={drag.onDrop}
-        draggable={TOUCH_DRAG || undefined}
+        draggable={(canEdit && TOUCH_DRAG) || undefined}
         onDragStart={TOUCH_DRAG ? drag.onDragStart : undefined}
         onDragEnd={TOUCH_DRAG ? drag.onDragEnd : undefined}
       >
@@ -1016,6 +1047,7 @@ function PageTreeItem({
             of the row keep working normally. */}
         <span
           className="page-grip"
+          hidden={!canEdit}
           draggable={!TOUCH_DRAG}
           title="Drag to reorder or move"
           onDragStart={TOUCH_DRAG ? undefined : drag.onDragStart}
@@ -1026,10 +1058,10 @@ function PageTreeItem({
 
         <span
           ref={iconRef}
-          className="page-icon-editable"
+          className={canEdit ? 'page-icon-editable' : undefined}
           onClick={(e) => {
             e.stopPropagation()
-            setPickerAnchor(iconRef.current)
+            if (canEdit) setPickerAnchor(iconRef.current)
           }}
         >
           <PageIcon icon={page.icon} className="page-icon" />
@@ -1062,20 +1094,24 @@ function PageTreeItem({
             }}
           />
         ) : (
-          <span
+          // Click/Enter bubbles to the row's onClick, which opens the page.
+          <button
+            type="button"
             className={'page-title' + (page.title ? '' : ' page-title-empty')}
+            aria-current={activeId === page.id ? 'page' : undefined}
             onDoubleClick={(e) => {
               e.stopPropagation()
+              if (!canEdit) return
               setDraftTitle(page.title)
               setRenaming(true)
             }}
-            title="Double-click to rename"
+            title={canEdit ? 'Double-click to rename' : undefined}
           >
             {page.title || 'Untitled'}
-          </span>
+          </button>
         )}
 
-        <span onClick={(e) => e.stopPropagation()}>
+        <span onClick={(e) => e.stopPropagation()} hidden={!canEdit}>
           <CreatePageButton
             spaceId={spaceId}
             parentId={page.id}
@@ -1087,25 +1123,33 @@ function PageTreeItem({
         <span onClick={(e) => e.stopPropagation()}>
           <RowMenu
             items={[
-              {
-                label: 'Rename',
-                onClick: () => {
-                  setDraftTitle(page.title)
-                  setRenaming(true)
-                },
-              },
-              ...(moves
-                ? moveItems(prevId, nextId, (target, pos) => moves.movePage(page.id, spaceId, parentId, target, pos))
+              ...(canEdit
+                ? [
+                    {
+                      label: 'Rename',
+                      onClick: () => {
+                        setDraftTitle(page.title)
+                        setRenaming(true)
+                      },
+                    },
+                    ...(moves
+                      ? moveItems(prevId, nextId, (target, pos) => moves.movePage(page.id, spaceId, parentId, target, pos))
+                      : []),
+                    { label: 'Move elsewhere...', onClick: (anchorEl: HTMLElement) => onOpenMoveTo(page.id, anchorEl) },
+                  ]
                 : []),
-              { label: 'Move elsewhere...', onClick: (anchorEl) => onOpenMoveTo(page.id, anchorEl) },
               { label: 'Export as Markdown', onClick: () => downloadUrl(`/api/pages/${page.id}/export.md`) },
-              {
-                label: 'Archive',
-                danger: true,
-                onClick: () => {
-                  if (window.confirm(`Archive "${page.title || 'Untitled'}"?`)) onArchivePage(page.id)
-                },
-              },
+              ...(canEdit
+                ? [
+                    {
+                      label: 'Archive',
+                      danger: true,
+                      onClick: () => {
+                        if (window.confirm(`Archive "${page.title || 'Untitled'}"?`)) onArchivePage(page.id)
+                      },
+                    },
+                  ]
+                : []),
             ]}
           />
         </span>
@@ -1117,6 +1161,7 @@ function PageTreeItem({
             depth={depth + 1}
             spaceId={spaceId}
             parentId={page.id}
+            canEdit={canEdit}
             activeId={activeId}
             onSelect={onSelect}
             onRenamePage={onRenamePage}
@@ -1359,9 +1404,12 @@ export default function Sidebar({
       }
       if (!draggedSpaceId) return
       const space = teamspaces.find((t) => t.id === draggedSpaceId)
-      if (!space || space.groupId === groupId) return
-      e.preventDefault()
+      if (!space) return
+      // Its own group: nothing to do here, and the sidebar-wide
+      // "drop at the end" fallback mustn't light up the last group either.
       e.stopPropagation()
+      if (space.groupId === groupId) return
+      e.preventDefault()
       setSpaceDropGroupId((cur) => (cur === groupId ? cur : groupId))
     }
   }

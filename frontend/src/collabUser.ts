@@ -11,6 +11,10 @@ export interface CollabUser {
 const PALETTE = ['#e03e3e', '#d9730d', '#cb912f', '#448361', '#337ea9', '#9065b0', '#c14c8a', '#0f7b6c']
 
 let localUser: CollabUser = { name: 'Anonymous', color: PALETTE[4] }
+let localUserId = ''
+
+// Who is signed in, so saved offline edits are only ever resent as them.
+export const getCollabUserId = () => localUserId
 const listeners = new Set<(user: CollabUser) => void>()
 
 export const getCollabUser = () => localUser
@@ -18,6 +22,7 @@ export const getCollabUser = () => localUser
 /** Sets the name/color others see on your cursor (color derived from
  * the user id, so it is stable across sessions and devices). */
 export function setCollabUser(id: string, name: string) {
+  localUserId = id
   let h = 0
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   localUser = { name, color: PALETTE[h % PALETTE.length] }

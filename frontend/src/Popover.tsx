@@ -89,15 +89,54 @@ export default function Popover({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose, anchorEl])
 
+  // Keyboard use: focus moves in on open (unless the content already
+  // focused its own field) and back to the trigger on close.
+  useEffect(() => {
+    const root = rootRef.current
+    if (root && !root.contains(document.activeElement)) menuItems(root)[0]?.focus()
+    return () => {
+      if (root?.contains(document.activeElement)) anchorEl.focus()
+    }
+  }, [anchorEl])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      onClose()
+      return
+    }
+    const target = e.target as HTMLElement
+    // Arrows keep their own meaning inside selects, textareas and number fields.
+    if (target.matches('select, textarea, input[type="number"], input[type="date"]')) return
+    const items = menuItems(rootRef.current!)
+    if (items.length === 0) return
+    const i = items.indexOf(target as HTMLButtonElement)
+    const next =
+      e.key === 'ArrowDown' ? items[(i + 1) % items.length]
+      : e.key === 'ArrowUp' ? items[(i - 1 + items.length) % items.length]
+      : e.key === 'Home' ? items[0]
+      : e.key === 'End' ? items[items.length - 1]
+      : null
+    if (!next) return
+    e.preventDefault()
+    next.focus()
+  }
+
   return createPortal(
     <div
       ref={rootRef}
       className={className ? `popover-panel ${className}` : 'popover-panel'}
       style={{ top: pos.top, left: pos.left, width, maxHeight }}
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={handleKeyDown}
     >
       {children}
     </div>,
     document.body,
   )
+}
+
+// The panel's usable buttons, in order: what the arrow keys move between.
+function menuItems(root: HTMLElement): HTMLButtonElement[] {
+  return Array.from(root.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')).filter((b) => !b.closest('[hidden]'))
 }

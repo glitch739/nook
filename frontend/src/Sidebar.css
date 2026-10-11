@@ -616,6 +616,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* A real <button> (keyboard-reachable) that still looks like plain text. */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: inherit;
+}
+
+.page-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
 }
 
 .page-title-empty {

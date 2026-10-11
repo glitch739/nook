@@ -99,7 +99,7 @@ function SelectCellPopover({
 
   function renameOption(id: string) {
     const label = draftLabel.trim()
-    if (label) onOptionsChanged(options.map((o) => (o.id === id ? { ...o, label } : o)))
+    if (label && label !== options.find((o) => o.id === id)?.label) onOptionsChanged(options.map((o) => (o.id === id ? { ...o, label } : o)))
     setEditingId(null)
   }
 
@@ -258,7 +258,8 @@ function TextCell({ value, onChange }: { value: unknown; onChange: (value: unkno
   }, [editing])
 
   function commit() {
-    onChange(draft)
+    // Every save is a write plus a live refresh for everyone; skip no-ops.
+    if (draft !== (typeof value === 'string' ? value : '')) onChange(draft)
     setEditing(false)
   }
 
@@ -319,7 +320,9 @@ function NumberCell({ value, onChange }: { value: unknown; onChange: (value: unk
 
   function commit() {
     const n = draft.trim() === '' ? null : Number(draft)
-    onChange(Number.isFinite(n) ? n : null)
+    const next = Number.isFinite(n) ? n : null
+    // Enter and then the blur both land here; save only a real change.
+    if (next !== (typeof value === 'number' ? value : null)) onChange(next)
   }
 
   return (
@@ -553,6 +556,25 @@ function PersonCell({
 // -- Dispatcher ---------------------------------------------------------
 
 export default function PropertyCell({
+  readOnly = false,
+  ...props
+}: {
+  property: Property
+  value: unknown
+  onChange: (value: unknown) => void
+  onOptionsChanged: (options: SelectOption[]) => void
+  /** A viewer's cell: shown, but every control inside is disabled. */
+  readOnly?: boolean
+}) {
+  if (!readOnly) return <EditableCell {...props} />
+  return (
+    <fieldset disabled className="cell-readonly">
+      <EditableCell {...props} />
+    </fieldset>
+  )
+}
+
+function EditableCell({
   property,
   value,
   onChange,

@@ -239,11 +239,11 @@ func (a spacesAPI) updateSpaceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // moveSpaceHandler handles PUT /api/spaces/{spaceID}/move
-// (RequireAuth-protected). Body: {"group_id": "..."}. Requires at least
-// editor on *both* the space's current group and the destination group
-// -- same "both ends" reasoning as movePageHandler.
+// (RequireAuth-protected). Body: {"group_id": "..."}. Requires owner on
+// the space (moving it changes who can see it, like archiving does) and
+// at least editor on the destination group.
 func (a spacesAPI) moveSpaceHandler(w http.ResponseWriter, r *http.Request) {
-	sp, ok := a.authorizeSpace(w, r, r.PathValue("spaceID"), spaces.RoleEditor)
+	sp, ok := a.authorizeSpace(w, r, r.PathValue("spaceID"), spaces.RoleOwner)
 	if !ok {
 		return
 	}

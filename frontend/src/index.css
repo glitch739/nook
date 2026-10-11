@@ -142,6 +142,11 @@
   color-scheme: dark;
 }
 
+/* The hidden attribute always wins over a component's own display rule. */
+[hidden] {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
   /* Thin, theme-colored scrollbars everywhere. Windows Chrome/Edge/Brave

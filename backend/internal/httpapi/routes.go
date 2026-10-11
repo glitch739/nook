@@ -123,7 +123,9 @@ func NewMux(deps Deps) http.Handler {
 	mux.Handle("POST /api/auth/reset", public(acc.resetHandler))
 
 	mux.Handle("GET /api/me", authed(acc.meHandler))
-	mux.Handle("PUT /api/me", authed(acc.updateMeHandler))
+	// Login budget: an email change checks the password.
+	mux.Handle("PUT /api/me",
+		maxBody(loginBodyLimit)(deps.LoginLimiter.Middleware(deps.Auth.RequireAuth(http.HandlerFunc(acc.updateMeHandler)))))
 	mux.Handle("GET /api/me/preferences", authed(acc.preferencesHandler))
 	mux.Handle("PUT /api/me/preferences", authed(acc.updatePreferencesHandler))
 	mux.Handle("POST /api/me/verify-email", authed(acc.resendVerificationHandler))
@@ -298,7 +300,7 @@ func NewMux(deps Deps) http.Handler {
 	// The collab WebSocket is long-lived, so it must bypass
 	// TimeoutHandler (which also can't hijack a connection).
 	if deps.CollabHub != nil {
-		ca := collabAPI{hub: deps.CollabHub, pages: deps.Pages, perm: deps.Permissions}
+		ca := collabAPI{hub: deps.CollabHub, pages: deps.Pages, perm: deps.Permissions, auth: deps.Auth}
 		outer.Handle("GET /api/pages/{pageID}/collab", deps.Auth.RequireAuth(http.HandlerFunc(ca.collabHandler)))
 	}
 	outer.Handle("/", handler)

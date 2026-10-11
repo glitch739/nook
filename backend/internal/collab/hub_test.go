@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func TestHubProtocol(t *testing.T) {
 	edits := make(chan string, 10)
 	hub := NewHub(store, Hooks{OnEdit: func(_ context.Context, userID, pageID string) { edits <- pageID }})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hub.Serve(w, r, p.ID, u.ID, r.URL.Query().Get("ro") == "1")
+		hub.Serve(w, r, p.ID, u.ID, r.URL.Query().Get("ro") == "1", nil)
 	}))
 	defer srv.Close()
 
@@ -170,7 +171,7 @@ func TestInitHandoff(t *testing.T) {
 	p, _ := pages.NewStore(conn).Create(ctx, sp.ID, nil, "Doc", u.ID, pages.KindDocument)
 	hub := NewHub(NewStore(conn), Hooks{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hub.Serve(w, r, p.ID, u.ID, false)
+		hub.Serve(w, r, p.ID, u.ID, false, nil)
 	}))
 	defer srv.Close()
 
@@ -182,4 +183,40 @@ func TestInitHandoff(t *testing.T) {
 	b.expect("synced")
 	a.ws.Close(websocket.StatusNormalClosure, "")
 	b.expect("init")
+}
+
+// A connection whose access check starts failing is closed on the next
+// ping tick, and stays open while it passes.
+func TestRevokedAccessCloses(t *testing.T) {
+	ctx := context.Background()
+	conn := dbtest.New(t)
+	u, _ := users.NewStore(conn).Create(ctx, "anna", "h", "Anna")
+	g, _ := groups.NewStore(conn).Create(ctx, "G", u.ID)
+	sp, _ := spaces.NewStore(conn).Create(ctx, "S", spaces.TypePrivate, u.ID, g.ID)
+	p, _ := pages.NewStore(conn).Create(ctx, sp.ID, nil, "Doc", u.ID, pages.KindDocument)
+
+	old := pingEvery
+	pingEvery = 20 * time.Millisecond
+	t.Cleanup(func() { pingEvery = old })
+	var allowed atomic.Bool
+	allowed.Store(true)
+	hub := NewHub(NewStore(conn), Hooks{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hub.Serve(w, r, p.ID, u.ID, false, func(context.Context) bool { return allowed.Load() })
+	}))
+	defer srv.Close()
+
+	a := dial(t, srv.URL)
+	a.expect("hello")
+	a.expect("synced")
+	time.Sleep(100 * time.Millisecond) // several ticks pass while allowed
+	a.sendText(map[string]any{"t": "init_done"})
+	a.expect("ready")
+
+	allowed.Store(false)
+	rctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if _, _, err := a.ws.Read(rctx); websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+		t.Fatalf("read after revoke: %v, want a normal close", err)
+	}
 }

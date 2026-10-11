@@ -41,8 +41,8 @@ func (s *Store) Sweep(ctx context.Context, grace, orphanGrace time.Duration, dry
 	}{{"page_images", &res.Images}, {"page_attachments", &res.Attachments}} {
 		rows, err := s.db.QueryContext(ctx, `
 			SELECT a.id, a.size_bytes FROM `+t.table+` a
-			JOIN pages p ON p.id = a.page_id
-			WHERE a.created_at < ? AND instr(p.content_json, a.id) = 0;`, cutoff)
+			WHERE a.created_at < ?
+			  AND NOT EXISTS (SELECT 1 FROM pages p WHERE instr(p.content_json, a.id) > 0);`, cutoff)
 		if err != nil {
 			return res, fmt.Errorf("assets: sweep %s: %w", t.table, err)
 		}

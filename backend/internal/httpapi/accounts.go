@@ -397,8 +397,9 @@ func (a accountsAPI) updatePreferencesHandler(w http.ResponseWriter, r *http.Req
 // PUT /api/me {display_name?, email?}
 func (a accountsAPI) updateMeHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DisplayName *string `json:"display_name"`
-		Email       *string `json:"email"`
+		DisplayName     *string `json:"display_name"`
+		Email           *string `json:"email"`
+		CurrentPassword string  `json:"current_password"`
 	}
 	if !httpx.DecodeJSONBody(w, r, &req) {
 		return
@@ -406,6 +407,14 @@ func (a accountsAPI) updateMeHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := a.currentUser(w, r)
 	if !ok {
 		return
+	}
+	// A new email can reset the password, so changing it needs the
+	// current one: a borrowed session must not become a lasting takeover.
+	if req.Email != nil && users.NormalizeEmail(*req.Email) != u.Email {
+		if ok, err := auth.VerifyPassword(u.PasswordHash, req.CurrentPassword); err != nil || !ok {
+			http.Error(w, "current password is incorrect", http.StatusForbidden)
+			return
+		}
 	}
 	if req.DisplayName != nil {
 		name := trimName(*req.DisplayName)

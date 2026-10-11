@@ -498,6 +498,43 @@ func TestMove_ToAnotherSpace(t *testing.T) {
 	}
 }
 
+func TestMove_ToAnotherSpaceTakesChildren(t *testing.T) {
+	conn, user, space, store := setup(t)
+	ctx := context.Background()
+
+	group, err := groups.NewStore(conn).Create(ctx, "Another Group", user.ID)
+	if err != nil {
+		t.Fatalf("create another group: %v", err)
+	}
+	otherSpace, err := spaces.NewStore(conn).Create(ctx, "Other Space", spaces.TypePrivate, user.ID, group.ID)
+	if err != nil {
+		t.Fatalf("create other space: %v", err)
+	}
+	parent, err := store.Create(ctx, space.ID, nil, "Parent", user.ID, KindDocument)
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	child, err := store.Create(ctx, space.ID, &parent.ID, "Child", user.ID, KindDocument)
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+
+	if err := store.Move(ctx, parent.ID, otherSpace.ID, nil); err != nil {
+		t.Fatalf("Move: %v", err)
+	}
+
+	moved, err := store.GetByID(ctx, child.ID)
+	if err != nil {
+		t.Fatalf("GetByID(child): %v", err)
+	}
+	if moved.SpaceID != otherSpace.ID {
+		t.Fatalf("child SpaceID = %q, want %q", moved.SpaceID, otherSpace.ID)
+	}
+	if moved.ParentPageID == nil || *moved.ParentPageID != parent.ID {
+		t.Fatalf("child ParentPageID = %v, want %q", moved.ParentPageID, parent.ID)
+	}
+}
+
 func TestMove_RefusesSelfParent(t *testing.T) {
 	_, user, space, store := setup(t)
 	ctx := context.Background()

@@ -26,11 +26,17 @@ type sidebarAPI struct {
 
 type sidebarSpaceResponse struct {
 	spaceResponse
+	Role  string              `json:"role"` // the caller's effective role here
 	Pages []*treeNodeResponse `json:"pages"`
 }
 
+type sidebarGroupResponse struct {
+	groupResponse
+	Role string `json:"role"` // the caller's role in this group
+}
+
 type sidebarResponse struct {
-	Groups []groupResponse        `json:"groups"`
+	Groups []sidebarGroupResponse `json:"groups"`
 	Spaces []sidebarSpaceResponse `json:"spaces"`
 }
 
@@ -54,29 +60,29 @@ func (a sidebarAPI) sidebarHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := sidebarResponse{
-		Groups: make([]groupResponse, len(gs)),
+		Groups: make([]sidebarGroupResponse, len(gs)),
 		Spaces: make([]sidebarSpaceResponse, 0, len(ss)),
 	}
 	for i, ug := range gs {
-		resp.Groups[i] = toGroupResponse(ug.Group)
+		resp.Groups[i] = sidebarGroupResponse{groupResponse: toGroupResponse(ug.Group), Role: ug.Role}
 		resp.Groups[i].Position = ug.Position
 	}
 
 	ids := make([]string, 0, len(ss))
 	index := make(map[string]int, len(ss))
 	for _, us := range ss {
-		ok, err := a.perm.CanAccessSpace(ctx, userID, us.ID, spaces.RoleViewer)
+		role, err := a.perm.SpaceRole(ctx, userID, us.ID)
 		if err != nil {
 			internalError(w, err)
 			return
 		}
-		if !ok {
+		if role == "" {
 			continue
 		}
 		sr := toSpaceResponse(us.Space)
 		sr.Position = us.Position
 		index[us.ID] = len(resp.Spaces)
-		resp.Spaces = append(resp.Spaces, sidebarSpaceResponse{spaceResponse: sr, Pages: []*treeNodeResponse{}})
+		resp.Spaces = append(resp.Spaces, sidebarSpaceResponse{spaceResponse: sr, Role: role, Pages: []*treeNodeResponse{}})
 		ids = append(ids, us.ID)
 	}
 

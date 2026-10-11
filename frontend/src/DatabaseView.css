@@ -15,9 +15,13 @@
   --db-border: color-mix(in srgb, var(--border) 55%, transparent);
 }
 
-.database-table-wrap {
+/* Filter bar stacked above the table; the row panel stays beside both. */
+.database-main {
   flex: 1;
   min-width: 0;
+}
+
+.database-table-wrap {
   overflow-x: auto;
   /* Room so the scrollbar (once it appears) doesn't sit flush against
      "+ New row" right below it. */
@@ -648,4 +652,79 @@
 .row-detail-body {
   flex: 1;
   min-height: 10rem;
+}
+
+/* Sort/filter bar above the table (dbView.ts). */
+.db-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.db-view-filter {
+  flex: 1 1 160px;
+  max-width: 260px;
+}
+
+/* Same look as the sidebar search box. */
+.db-view-filter,
+.db-view-sort,
+.db-view-dir {
+  box-sizing: border-box;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.db-view-filter::placeholder {
+  color: var(--text-muted);
+}
+
+.db-view-filter:focus,
+.db-view-sort:focus,
+.db-view-dir:focus-visible {
+  background-color: var(--surface-solid);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.db-view-sort,
+.db-view-dir {
+  cursor: pointer;
+}
+
+/* Native search and select styling (macOS especially) adds its own
+   rounding and chrome; switch it off so both share one shape. */
+.db-view-filter,
+.db-view-sort {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.db-view-filter::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+.db-view-sort {
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+}
+
+.db-view-dir {
+  min-width: 2rem;
+  padding: 0;
 }

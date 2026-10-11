@@ -35,6 +35,13 @@ func TestSweep(t *testing.T) {
 	kept, _ := as.AddImage(ctx, page.ID, bytes.NewReader(png), "kept.png", u.ID)
 	oldUnused, _ := as.AddImage(ctx, page.ID, bytes.NewReader(png), "old.png", u.ID)
 	newUnused, _ := as.AddImage(ctx, page.ID, bytes.NewReader(png), "new.png", u.ID)
+	// Uploaded on page, then cut and pasted into other: the link keeps page's ID.
+	pasted, _ := as.AddImage(ctx, page.ID, bytes.NewReader(png), "pasted.png", u.ID)
+	other, _ := ps.Create(ctx, sp.ID, nil, "Other", u.ID, pages.KindDocument)
+	if _, err := conn.Exec(`UPDATE pages SET content_json = ? WHERE id = ?`,
+		`{"type":"doc","content":[{"type":"image","attrs":{"src":"/api/pages/`+page.ID+`/images/`+pasted.ID+`"}}]}`, other.ID); err != nil {
+		t.Fatal(err)
+	}
 	att, err := as.AddAttachment(ctx, page.ID, bytes.NewReader([]byte("%PDF")), "doc.pdf", u.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +52,7 @@ func TestSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
-	for _, id := range []string{kept.ID, oldUnused.ID} {
+	for _, id := range []string{kept.ID, oldUnused.ID, pasted.ID} {
 		conn.Exec(`UPDATE page_images SET created_at = ? WHERE id = ?`, old, id)
 	}
 	conn.Exec(`UPDATE page_attachments SET created_at = ? WHERE id = ?`, old, att.ID)
@@ -73,7 +80,7 @@ func TestSweep(t *testing.T) {
 	}
 	exists := func(n string) bool { _, err := os.Stat(filepath.Join(dir, n)); return err == nil }
 	for n, want := range map[string]bool{
-		kept.ID: true, newUnused.ID: true, newOrphan: true, "README.txt": true,
+		kept.ID: true, pasted.ID: true, newUnused.ID: true, newOrphan: true, "README.txt": true,
 		oldUnused.ID: false, att.ID: false, oldOrphan: false,
 	} {
 		if exists(n) != want {

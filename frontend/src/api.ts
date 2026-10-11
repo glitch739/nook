@@ -131,10 +131,8 @@ export interface Page {
   updated_by_name: string
 }
 
-// PropertyType: a database page's column types. 'person' is a plain
-// display-name string today, not a real per-user reference -- Nook has
-// no space-membership listing API yet (that's Phase 2 territory), so a
-// proper person-picker isn't possible until that exists.
+// PropertyType: a database page's column types. A 'person' value is
+// {user_id} of someone who can reach the space (see listPeople).
 export type PropertyType = 'text' | 'select' | 'date' | 'person' | 'number' | 'checkbox'
 
 export interface SelectOption {
@@ -156,8 +154,9 @@ export interface Property {
 // Row is one row of a database page (really just a lightweight view of
 // one of its child pages) plus its cell values, keyed by property id.
 // A value's shape depends on the owning property's type: a string for
-// text/date/person, a number for number, a bool for checkbox, or
-// {option_id} for select -- see the backend migration's comment.
+// text/date, a number for number, a bool for checkbox, {option_id} for
+// select, or {user_id} for person (older cells may still hold a name
+// string) -- see the backend migration's comment.
 export interface Row {
   id: string
   title: string
@@ -242,7 +241,7 @@ export const forgotPassword = (email: string) => send('POST', '/api/auth/forgot'
 export const resetPassword = (token: string, password: string) =>
   send('POST', '/api/auth/reset', { token, password })
 
-export const updateMe = (changes: { display_name?: string; email?: string }) =>
+export const updateMe = (changes: { display_name?: string; email?: string; current_password?: string }) =>
   send<User>('PUT', '/api/me', changes)
 export const changePassword = (current_password: string, new_password: string) =>
   send('PUT', '/api/me/password', { current_password, new_password })
@@ -286,8 +285,9 @@ export async function me(): Promise<User | null> {
 // The whole sidebar in one request (GET /api/sidebar): the caller's
 // groups and spaces, in their own order, each space with its page tree.
 export interface SidebarPayload {
-  groups: Group[]
-  spaces: (Space & { pages: TreeNode[] })[]
+  // role: the caller's own role, so the UI offers only what the server allows.
+  groups: (Group & { role: GroupMember['role'] })[]
+  spaces: (Space & { role: GroupMember['role']; pages: TreeNode[] })[]
 }
 export const getSidebar = () => send<SidebarPayload>('GET', '/api/sidebar')
 

@@ -6,6 +6,7 @@ import {
   type Property,
   type SelectOption,
 } from './api'
+import { notifyError } from './toast'
 import { useLiveRefresh, useLocalWrites } from './liveEvents'
 import './RowPropertiesBar.css'
 import PropertyCell from './PropertyCell'
@@ -27,9 +28,11 @@ interface RowProperties {
 export default function RowPropertiesBar({
   rowId,
   databasePageId,
+  readOnly = false,
 }: {
   rowId: string
   databasePageId: string
+  readOnly?: boolean
 }) {
   const [data, setData] = useState<RowProperties | null>(null)
 
@@ -80,14 +83,14 @@ export default function RowPropertiesBar({
 
   function handleChange(propertyId: string, value: unknown) {
     setData((d) => (d ? { ...d, values: { ...d.values, [propertyId]: value } } : d))
-    writes.track(setRowPropertyApi(rowId, propertyId, value)).catch((e) => console.error('failed to save cell', e))
+    writes.track(setRowPropertyApi(rowId, propertyId, value)).catch((e) => notifyError('Could not save cell', e))
   }
 
   function handleOptionsChanged(propertyId: string, options: SelectOption[]) {
     setData((d) =>
       d ? { ...d, properties: d.properties.map((p) => (p.id === propertyId ? { ...p, options } : p)) } : d,
     )
-    writes.track(updatePropertyApi(propertyId, { options })).catch((e) => console.error('failed to save options', e))
+    writes.track(updatePropertyApi(propertyId, { options })).catch((e) => notifyError('Could not save options', e))
   }
 
   if (!data || data.properties.length === 0) return null
@@ -103,6 +106,7 @@ export default function RowPropertiesBar({
               value={data.values[prop.id]}
               onChange={(v) => handleChange(prop.id, v)}
               onOptionsChanged={(options) => handleOptionsChanged(prop.id, options)}
+              readOnly={readOnly}
             />
           </div>
         ))}

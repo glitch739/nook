@@ -6,6 +6,7 @@ import {
   setPageCoverPosition,
   uploadPageCover,
 } from './api'
+import { notifyError } from './toast'
 import './PageCover.css'
 import { startPointerDrag } from './pointerDrag'
 
@@ -16,7 +17,8 @@ const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 // shows through the fixed-height crop window (object-position, backed
 // by internal/assets' position_y). Shown above both Editor and
 // DatabaseView in App.tsx, for either kind of page.
-export default function PageCover({ pageId }: { pageId: string }) {
+// readOnly: a viewer sees the cover but none of the controls.
+export default function PageCover({ pageId, readOnly = false }: { pageId: string; readOnly?: boolean }) {
   const [status, setStatus] = useState<'checking' | 'present' | 'absent'>('checking')
   const [positionY, setPositionY] = useState(50)
   // The cover URL is stable per page (/api/pages/{id}/cover, not an
@@ -76,7 +78,7 @@ export default function PageCover({ pageId }: { pageId: string }) {
       setStatus('present')
       setRepositioning(false)
     } catch (err) {
-      console.error('failed to upload cover', err)
+      notifyError('Could not upload cover', err)
     } finally {
       setUploading(false)
     }
@@ -88,7 +90,7 @@ export default function PageCover({ pageId }: { pageId: string }) {
       setStatus('absent')
       setRepositioning(false)
     } catch (err) {
-      console.error('failed to remove cover', err)
+      notifyError('Could not remove cover', err)
     }
   }
 
@@ -104,7 +106,7 @@ export default function PageCover({ pageId }: { pageId: string }) {
     try {
       await setPageCoverPosition(pageId, next)
     } catch (err) {
-      console.error('failed to save cover position', err)
+      notifyError('Could not save cover position', err)
     }
   }
 
@@ -144,7 +146,7 @@ export default function PageCover({ pageId }: { pageId: string }) {
         </div>
       )}
 
-      {status === 'absent' && (
+      {status === 'absent' && !readOnly && (
         <button
           type="button"
           className="page-cover-add"
@@ -155,7 +157,7 @@ export default function PageCover({ pageId }: { pageId: string }) {
         </button>
       )}
 
-      {status === 'present' && !repositioning && (
+      {status === 'present' && !repositioning && !readOnly && (
         <div className="page-cover-actions">
           <button type="button" className="page-cover-btn" onClick={() => fileInputRef.current?.click()}>
             Replace

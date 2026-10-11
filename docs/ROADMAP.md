@@ -9,7 +9,8 @@ up/down for touch, file attachments, Person column, archive view.
 
 1. **Publish on GitHub** -- plan and decisions in
    [PUBLISHING.md](PUBLISHING.md); CI workflow prepared.
-2. **2FA (TOTP)** on Nook's own login.
+2. ~~2FA (TOTP)~~ -- deferred 2026-10-11: Cloudflare Access already
+   acts as the second factor in front of the app (see Phase 2).
 3. **Raspberry Pi** -- the image already builds for arm64 in CI.
 4. Open review items: [REVIEW-2026-10.md](REVIEW-2026-10.md).
 
@@ -229,6 +230,14 @@ hardening pass (ADR 0008) is marked per item:
   in Phase 6's pre-launch checklist) plus a basic incident-response
   note: what "we got popped" actually triggers (rotate secrets, which
   logs to pull, how to tell what was accessed).
+- [x] *Done 2026-10-11: full backend audit.* Fixed: moving a page now
+  moves its subtree, moving a space needs owner, the upload sweep checks
+  every page, live-editing connections re-check access every 25 s,
+  archived spaces grant nothing by direct link, an email change needs
+  the current password, cover uploads are sniffed. Still open from it:
+  off-machine backup copy (same as the backup item above), account setup
+  in one transaction, a one-off check of live data for pages split
+  across spaces before the move fix.
 - Worth a dedicated pass (possibly its own ADR) once Phase 6 packaging
   exists — hardening a not-yet-Dockerized, not-yet-publicly-reachable
   app is premature optimization; sequence matters here.
@@ -261,7 +270,9 @@ hardening pass (ADR 0008) is marked per item:
   - [x] 9. Sessions: hashed IDs, metadata, sliding expiry, list/revoke
   - [x] 10. Frontend: sign-up/forgot/reset/verify screens, Settings modal,
         "last edited by" + activity panel, GroupMembers user picker
-- **2FA (TOTP)** — RFC 6238 time-based codes, `github.com/pquerna/otp`
+- **2FA (TOTP)** -- *Deferred 2026-10-11:* Cloudflare Access (ADR 0008)
+  covers 2FA in front of the app for now; revisit before any instance
+  runs without Access. RFC 6238 time-based codes, `github.com/pquerna/otp`
   (no external service needed, just a per-user secret stored encrypted).
   Natural fit here since it's a per-account setting and this phase is
   already touching account management.
@@ -279,8 +290,8 @@ hardening pass (ADR 0008) is marked per item:
       snapshots in SQLite
 - [x] Presence (carets, avatars), conflict-free merging, ack-based
       no-data-loss sync
-- [ ] Live sidebar: page titles/icons/tree changes pushed to others
-- [ ] Live database cells
+- [x] Live sidebar: page titles/icons/tree changes pushed to others (SSE, 2026-10-03)
+- [x] Live database cells (the same SSE "data" signal)
 
 ## Phase 4 — Search & structure
 
@@ -288,7 +299,7 @@ hardening pass (ADR 0008) is marked per item:
 - [x] SQLite FTS5 over page title + extracted plain text from `content_json`
       (+ database text/number/select cells) -- [ADR 0007](adr/0007-sidebar-search.md)
 - [x] Sidebar search UI (results list, highlight, breadcrumbs, ⌘K)
-- [ ] Global command palette (actions, not just navigation)
+- [x] Global command palette (actions, not just navigation) -- Cmd/Ctrl+K, 2026-10-03
 
 ## Phase 5 — Polish
 
@@ -306,7 +317,8 @@ hardening pass (ADR 0008) is marked per item:
         pages deleted for good. Needs a job that walks `content_json`.
   - [ ] Per-user or per-instance storage quota, surfaced in the admin
         panel
-- Error handling, logging, basic monitoring
+- Error handling, logging, basic monitoring -- *2026-10-11: user-facing
+  errors now show as toasts (archive gets Undo); monitoring still open*
 
 ## Phase 6 — Deployment
 
@@ -413,7 +425,11 @@ backend review, the instance name and Docker are not started.
 - **Mobile-responsive frontend.** *First pass done 2026-09-30 (see
   DEVLOG): drawer sidebar, touch-visible controls, phone layout for
   editor/database/dialogs. Still open: touch reordering (drag-and-drop
-  replacement), real-device Safari testing, PWA manifest.* Requested 2026-09-28. Confirmed
+  replacement), real-device Safari testing, PWA manifest.* *2026-10-11: Move
+  up/down for touch and the manifest exist; service worker (offline app
+  shell) and IndexedDB copy of unsaved edits added. Still open: real-device
+  testing, toolbar above the on-screen keyboard, a phone layout for
+  databases.* Requested 2026-09-28. Confirmed
   ~zero mobile support today (`grep`: exactly one width breakpoint in
   the whole frontend, in `Settings.css`) — everything else assumes a
   fixed desktop side-by-side sidebar+workspace layout. Two things make
@@ -446,6 +462,16 @@ backend review, the instance name and Docker are not started.
   pass above, not before, so the image being built is the stable one.
 
 ## Noted for later (not yet scoped into a phase)
+
+- [x] *Done 2026-10-11.* **Role-aware UI**: the sidebar API returns the
+  caller's role per space and group; viewers get no edit controls.
+- [x] *Done 2026-10-11.* **Database sort and filter** (per browser, per
+  database), column widths remembered. Shared saved views still open.
+- **Page history** (versions and restore). Needs a decision first: how
+  many versions to keep, and how a restore interacts with live editing.
+- **Comments, @mentions, notifications; per-page sharing / public
+  links; import (Markdown, Notion); avatars; virtualized rows for very
+  large databases.** Raised in the 2026-10-11 review; not scoped yet.
 
 - [x] *Done 2026-09-20 as database pages (ADR 0004).* **Structured page properties / database-style table views**, e.g. a
   page list with Status/Priority/Ticket columns, filterable views

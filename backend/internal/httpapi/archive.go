@@ -90,7 +90,7 @@ func (a archiveAPI) restoreSpaceHandler(w http.ResponseWriter, r *http.Request) 
 	if groupArchived {
 		allowed, err = a.perm.CanAccessGroup(ctx, userID, sp.GroupID, groups.RoleOwner)
 	} else {
-		allowed, err = a.perm.CanAccessSpace(ctx, userID, sp.ID, spaces.RoleOwner)
+		allowed, err = a.perm.CanAccessArchivedSpace(ctx, userID, sp.ID, spaces.RoleOwner)
 	}
 	if err != nil {
 		internalError(w, err)
@@ -165,7 +165,7 @@ func (a archiveAPI) deleteSpaceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Same rule as restore: through the group if the group is archived.
-	allowed, err := a.perm.CanAccessSpace(ctx, userID, sp.ID, spaces.RoleOwner)
+	allowed, err := a.perm.CanAccessArchivedSpace(ctx, userID, sp.ID, spaces.RoleOwner)
 	if err == nil && !allowed && sp.GroupID != "" {
 		allowed, err = a.perm.CanAccessGroup(ctx, userID, sp.GroupID, groups.RoleOwner)
 	}

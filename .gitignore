@@ -24,3 +24,4 @@
 # Editor / OS
 .DS_Store
 *.swp
+.codegraph/

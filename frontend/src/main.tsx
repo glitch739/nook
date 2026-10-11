@@ -23,6 +23,13 @@ watchStandaloneTitlebar()
 enableDragDropTouch(document, document, { isPressHoldMode: true, pressHoldDelayMS: 350, pressHoldMargin: 10 })
 enableTouchDragExtras()
 
+// Production only: in dev it would cache Vite's unhashed modules.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.error('service worker', err))
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

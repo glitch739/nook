@@ -14,11 +14,14 @@ export default function EditableIcon({
   onChange,
   className = 'page-icon-editable',
   iconClassName = 'page-icon',
+  readOnly = false,
 }: {
   icon: string
   onChange: (icon: string) => void
   className?: string
   iconClassName?: string
+  /** Shows the icon without the picker (a viewer can't change it). */
+  readOnly?: boolean
 }) {
   const [pickerAnchor, setPickerAnchor] = useState<HTMLSpanElement | null>(null)
   const iconRef = useRef<HTMLSpanElement>(null)
@@ -29,7 +32,7 @@ export default function EditableIcon({
       className={className}
       onClick={(e) => {
         e.stopPropagation()
-        setPickerAnchor(iconRef.current)
+        if (!readOnly) setPickerAnchor(iconRef.current)
       }}
     >
       <PageIcon icon={icon} className={iconClassName} />
