@@ -8,6 +8,12 @@ services:
   nook:
     image: nook:latest
     restart: unless-stopped
+    # With the search profile on, start after Tika is up: files queued at
+    # startup would otherwise fail their first try and wait a minute.
+    depends_on:
+      tika:
+        condition: service_healthy
+        required: false
     # Run as the host user that owns ./data, so the database, uploads
     # and backups stay readable (and copyable) from the host.
     user: "${NOOK_UID:-1000}:${NOOK_GID:-1000}"
@@ -36,6 +42,31 @@ services:
     networks:
       nook:
         ipv4_address: 172.31.80.20
+
+  # Reads the text out of attached files (PDF, Office, e-mail, zip, ...)
+  # and OCRs scans and photos (Hungarian + English) for search, and turns
+  # Word/OpenDocument files into their preview (ADR 0009). Off until
+  # wanted: build the image once in the repo
+  #   docker build -t nook-tika:latest deploy/tika
+  # set NOOK_TIKA_URL=http://tika:9998 in .env, then
+  #   docker compose --profile search up -d
+  # Internal only: no published port, holds no data.
+  tika:
+    image: nook-tika:latest
+    profiles: [search]
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2
+    environment:
+      # Tesseract threads: 2 matches cpus above (about 25% faster per page).
+      OMP_THREAD_LIMIT: "2"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9998/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [nook]
 
   # Cloudflare Tunnel (ADR 0008). Off until a tunnel token is in .env:
   #   docker compose --profile tunnel up -d

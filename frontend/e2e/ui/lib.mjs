@@ -36,7 +36,12 @@ export async function session(type, suite, { width = 1400, height = 900 } = {}) 
   const browser = await engines[type].launch()
   const ctx = await browser.newContext({ viewport: { width, height }, extraHTTPHeaders: { Origin: BASE } })
   const api = ctx.request
-  const r = await api.post(BASE + '/api/auth/login', { data: USER })
+  // Many suites log in at once; the login rate limit answers 429 then.
+  let r = await api.post(BASE + '/api/auth/login', { data: USER })
+  for (let i = 0; r.status() === 429 && i < 6; i++) {
+    await new Promise((ok) => setTimeout(ok, 13000))
+    r = await api.post(BASE + '/api/auth/login', { data: USER })
+  }
   if (!r.ok()) throw new Error('login ' + r.status())
   const me = await (await api.get(BASE + '/api/me')).json()
   const spaces = await (await api.get(BASE + '/api/spaces')).json()

@@ -41,6 +41,10 @@ var attachmentTypes = map[string]string{
 	".ods":  "application/vnd.oasis.opendocument.spreadsheet",
 	".odp":  "application/vnd.oasis.opendocument.presentation",
 	".rtf":  "application/rtf",
+	// E-mails: read in the browser through mailview (sanitized), and
+	// their text is searchable (internal/extract).
+	".eml":  "message/rfc822",
+	".msg":  "application/vnd.ms-outlook",
 	".txt":  "text/plain",
 	".md":   "text/markdown",
 	".csv":  "text/csv",

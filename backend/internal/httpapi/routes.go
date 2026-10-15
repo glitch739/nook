@@ -46,6 +46,11 @@ type Deps struct {
 	// Optional: NewMux makes its own hub when nil.
 	Events *events.Hub
 	Search *search.Store
+	// FileIndex wakes the attachment text extraction worker after an
+	// upload, Docs converts documents for their preview (ADR 0009). Both
+	// nil without a Tika server.
+	FileIndex interface{ Wake() }
+	Docs      DocConverter
 	// Collab/CollabHub: realtime editing (ADR 0006). Optional in tests.
 	Collab    *collab.Store
 	CollabHub *collab.Hub
@@ -281,7 +286,12 @@ func NewMux(deps Deps) http.Handler {
 		deps.Auth.RequireAuth(http.HandlerFunc(imagesAPI.getImageHandler)))
 
 	// Files attached inside a page's text (PDF, Word, ...).
-	attachmentsAPI := attachmentsAPI{covers: coversAPI}
+	attachmentsAPI := attachmentsAPI{covers: coversAPI, index: deps.FileIndex, docs: deps.Docs}
+	mux.Handle("GET /api/pages/{pageID}/attachments/{attachmentID}/index",
+		deps.Auth.RequireAuth(http.HandlerFunc(attachmentsAPI.indexStatusHandler)))
+	// Outside the general timeout: converting a long document takes a while.
+	outer.Handle("GET /api/pages/{pageID}/attachments/{attachmentID}/view",
+		deps.Auth.RequireAuth(http.HandlerFunc(attachmentsAPI.viewHandler)))
 	outer.Handle("POST /api/pages/{pageID}/attachments",
 		upload(maxBody(attachmentUploadBodyLimit)(deps.Auth.RequireAuth(http.HandlerFunc(attachmentsAPI.uploadHandler)))))
 	outer.Handle("GET /api/pages/{pageID}/attachments/{attachmentID}",

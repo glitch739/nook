@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
@@ -71,6 +72,8 @@ type testEnv struct {
 	users  *users.Store
 	mail   *fakeMailer
 	collab *collab.Store
+	index  *fakeIndex
+	db     *sql.DB
 }
 
 func newTestEnv(t *testing.T, registration string) *testEnv {
@@ -83,8 +86,9 @@ func newTestEnv(t *testing.T, registration string) *testEnv {
 		t.Fatal(err)
 	}
 	cs := collab.NewStore(conn)
+	idx := &fakeIndex{}
 	h := NewMux(Deps{
-		Collab: cs,
+		Collab: cs, FileIndex: idx, Docs: fakeDocs{},
 		Assets: as,
 		Auth:   auth.NewHandler(us, auth.NewSessionStore(conn), false), Users: us,
 		Spaces: spaces.NewStore(conn), Groups: groups.NewStore(conn), Pages: pages.NewStore(conn),
@@ -96,7 +100,7 @@ func newTestEnv(t *testing.T, registration string) *testEnv {
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &testEnv{srv: srv, users: us, mail: fm, collab: cs}
+	return &testEnv{srv: srv, users: us, mail: fm, collab: cs, index: idx, db: conn}
 }
 
 func (e *testEnv) client() *http.Client {
@@ -351,4 +355,18 @@ func TestEmailChangeNeedsPassword(t *testing.T) {
 	if code := e.do(t, c, "PUT", "/api/me", m{"email": "anna2@example.hu", "current_password": "hosszujelszo"}, &me); code != 200 || me.Email != "anna2@example.hu" {
 		t.Fatalf("email change with password = %d %q", code, me.Email)
 	}
+}
+
+// privateSpace is c's own space (every new account gets one).
+func (e *testEnv) privateSpace(t *testing.T, c *http.Client) spaceResponse {
+	t.Helper()
+	var list []spaceResponse
+	e.do(t, c, "GET", "/api/spaces", nil, &list)
+	for _, s := range list {
+		if s.Type == "private" {
+			return s
+		}
+	}
+	t.Fatalf("no private space in %+v", list)
+	return spaceResponse{}
 }

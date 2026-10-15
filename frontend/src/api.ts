@@ -415,7 +415,42 @@ export interface SearchResult {
   title: string
   title_marked: string
   snippet: string
+  // Matching attachments of the page (ADR 0009), best first, at most 3.
+  files: SearchFileHit[]
 }
+
+// SearchFileHit: an attachment whose name or extracted text (OCR
+// included) matched. page_no is the PDF page of the match, 0 when there
+// is none; part names the embedded document ("/notes.docx" in a zip).
+export interface SearchFileHit {
+  file_id: string
+  url: string
+  filename: string
+  name_marked: string
+  previewable: boolean
+  page_no: number
+  part: string
+  snippet: string
+  used_ocr: boolean
+}
+
+// Where an attachment opens for reading, or null when it can only be
+// downloaded: PDFs, images and text inline (a PDF at pageNo), e-mails
+// and Word/OpenDocument/RTF as a cleaned page (backend preview.go).
+export function attachmentPreviewUrl(url: string, filename: string, previewable: boolean, pageNo = 0): string | null {
+  if (previewable) return `${url}?preview=1${pageNo > 0 ? `#page=${pageNo}` : ''}`
+  if (/\.(eml|docx?|odt|rtf)$/i.test(filename)) return `${url}/view`
+  return null
+}
+
+// FileIndexStatus: how far an attachment is in being made searchable.
+export interface FileIndexStatus {
+  status: 'pending' | 'processing' | 'done' | 'failed' | 'skipped'
+  used_ocr: boolean
+  has_text: boolean
+  error: string
+}
+export const getFileIndexStatus = (url: string) => send<FileIndexStatus>('GET', `${url}/index`)
 
 export function searchPages(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   return fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal }).then(parseJSONOrThrow<SearchResult[]>)

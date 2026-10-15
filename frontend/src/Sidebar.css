@@ -1210,3 +1210,14 @@
   color: var(--text);
 }
 
+
+/* An attachment that matched a search (SidebarSearch.tsx): indented
+   under its page's row. */
+.search-result-file {
+  padding-left: 1.6rem;
+}
+
+.search-result-file-icon {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}

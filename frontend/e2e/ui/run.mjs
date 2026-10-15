@@ -4,7 +4,7 @@
 // one server and keep to their own pages.
 import { failed } from './lib.mjs'
 
-const all = ['tabs', 'workspace', 'history', 'database']
+const all = ['tabs', 'workspace', 'history', 'database', 'search']
 const suites = process.argv.slice(2).length ? process.argv.slice(2) : all
 const browsers = (process.env.BROWSERS ?? 'chromium,webkit').split(',')
 const jobs = suites.flatMap((s) => browsers.map((b) => ({ s, b })))

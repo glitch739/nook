@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 // made old in the test database.
 function backdateVersions(pageId) {
   const db = new DatabaseSync(process.env.NOOK_DB)
+  db.exec('PRAGMA busy_timeout = 5000') // Nook may be mid-write
   db.prepare(`UPDATE page_versions SET created_at = '2000-01-01T00:00:00.000Z' WHERE page_id = ?`).run(pageId)
   db.close()
 }

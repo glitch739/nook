@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { attachmentPreviewUrl, getFileIndexStatus } from './api'
 
 // A file attached inside a page's text: a block "chip" with a type
 // badge, the file name and its size; clicking it downloads the file.
@@ -8,7 +9,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 // Mirrors assets.attachmentTypes on the server (the server decides; this
 // only lets the picker filter and gives an early, friendly error).
 export const ATTACHMENT_EXTENSIONS = [
-  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'eml', 'msg',
   'txt', 'md', 'csv', 'json', 'zip', '7z', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic',
   'mp3', 'm4a', 'mp4', 'mov',
 ]
@@ -104,6 +105,36 @@ export const FileAttachment = Node.create({
       meta.textContent = formatSize(size)
       a.append(badge, name, meta)
       dom.append(a)
+      // Read it in the browser where it can be (backend preview.go).
+      const preview = attachmentPreviewUrl(href, filename, /\.(pdf|png|jpe?g|gif|webp|txt|md|csv)$/i.test(filename))
+      if (preview) {
+        const view = document.createElement('a')
+        view.className = 'file-attachment-preview'
+        view.href = preview
+        view.target = '_blank'
+        view.rel = 'noopener'
+        view.textContent = 'Preview'
+        dom.append(view)
+      }
+      // How far the file is in being made searchable (ADR 0009); only
+      // said when it is news: still reading, read by OCR, or unreadable.
+      if (isNookAttachmentUrl(href)) {
+        void getFileIndexStatus(href).then(
+          (st) => {
+            const note =
+              st.status === 'pending' || st.status === 'processing'
+                ? 'indexing…'
+                : st.status === 'failed' || st.status === 'skipped'
+                  ? 'not searchable'
+                  : st.used_ocr
+                    ? 'OCR'
+                    : ''
+            if (note) meta.textContent = `${formatSize(size)} · ${note}`
+            if (st.error) meta.title = st.error
+          },
+          () => {},
+        )
+      }
       return {
         dom,
         // Let the browser handle clicks on the link (download) instead of

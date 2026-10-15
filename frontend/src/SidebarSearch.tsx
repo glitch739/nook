@@ -2,7 +2,11 @@
 //
 //  - pages: full-text search on the server (GET /api/search), which
 //    matches titles, document text and database cells, accent- and
-//    case-insensitively, as prefixes ("hazk" finds "Házkörüli").
+//    case-insensitively, as prefixes ("hazk" finds "Házkörüli") and,
+//    ranked after those, inside words ("db01" finds "srvdb01"), plus
+//    the names and text of attached files, OCR included (ADR 0009). A
+//    matching file is its own row under its page: opening it opens the
+//    page and the file's preview (a PDF at the matching page).
 //  - groups and spaces: filtered right here from what the sidebar has
 //    already loaded, with the same folding rules -- there are only ever
 //    a handful of them, so a round trip would buy nothing.
@@ -12,7 +16,7 @@
 // clears; Cmd/Ctrl+K focuses the box from anywhere.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { searchPages, type SearchResult } from './api'
+import { attachmentPreviewUrl, searchPages, type SearchFileHit, type SearchResult } from './api'
 import PageIcon from './PageIcon'
 import { findPageAncestors, type SidebarGroup, type TeamSpace } from './sidebarData'
 
@@ -88,6 +92,8 @@ function matchName(name: string, terms: string[]): ReactNode[] | null {
 
 type Item =
   | { kind: 'page'; key: string; result: SearchResult }
+  // A matching attachment, a row of its own under its page (ADR 0009).
+  | { kind: 'file'; key: string; result: SearchResult; hit: SearchFileHit }
   | { kind: 'group'; key: string; group: SidebarGroup; label: ReactNode[] }
   | { kind: 'space'; key: string; space: TeamSpace; label: ReactNode[] }
 
@@ -182,7 +188,10 @@ export default function SidebarSearch({
       const label = matchName(space.name, terms)
       if (label) spaceItems.push({ kind: 'space', key: `s:${space.id}`, space, label })
     }
-    const pageItems: Item[] = pages.map((result) => ({ kind: 'page', key: `p:${result.page_id}`, result }))
+    const pageItems: Item[] = pages.flatMap((result) => [
+      { kind: 'page' as const, key: `p:${result.page_id}`, result },
+      ...(result.files ?? []).map((hit) => ({ kind: 'file' as const, key: `f:${hit.file_id}`, result, hit })),
+    ])
     return { pageItems, placeItems: [...groupItems, ...spaceItems] }
   }, [groups, teamspaces, pages, terms])
 
@@ -198,7 +207,14 @@ export default function SidebarSearch({
 
   function activate(item: Item) {
     if (item.kind === 'page') onSelectPage(item.result.page_id)
-    else if (item.kind === 'group') onRevealSection('group', item.group.id)
+    else if (item.kind === 'file') {
+      // The page, and the file itself where it can be read (a PDF at the
+      // matching page) in a tab of its own.
+      onSelectPage(item.result.page_id)
+      const { url, filename, previewable, page_no } = item.hit
+      const preview = attachmentPreviewUrl(url, filename, previewable, page_no)
+      if (preview) window.open(preview, '_blank', 'noopener')
+    } else if (item.kind === 'group') onRevealSection('group', item.group.id)
     else onRevealSection('space', item.space.id)
   }
 
@@ -257,6 +273,23 @@ export default function SidebarSearch({
               <div className="search-result-path">{crumbs.filter(Boolean).join(' › ')}</div>
             )}
             {r.snippet && <div className="search-result-snippet">{splitMarked(r.snippet)}</div>}
+          </div>
+        </div>
+      )
+    }
+
+    if (item.kind === 'file') {
+      const h = item.hit
+      const where = [h.part.replace(/^\//, ''), h.page_no > 0 && `p. ${h.page_no}`, h.used_ocr && 'OCR'].filter(Boolean).join(' · ')
+      return (
+        <div key={item.key} {...common} className={`${className} search-result-file`} title="Open the page and the file">
+          <span className="search-result-icon search-result-file-icon" aria-hidden="true">
+            📎
+          </span>
+          <div className="search-result-body">
+            <div className="search-result-title">{splitMarked(h.name_marked)}</div>
+            {where && <div className="search-result-path">{where}</div>}
+            {h.snippet && <div className="search-result-snippet">{splitMarked(h.snippet)}</div>}
           </div>
         </div>
       )

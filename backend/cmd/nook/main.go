@@ -30,6 +30,7 @@ import (
 	"nook/internal/config"
 	"nook/internal/databases"
 	"nook/internal/db"
+	"nook/internal/extract"
 	"nook/internal/groups"
 	"nook/internal/httpapi"
 	"nook/internal/httpx"
@@ -164,6 +165,23 @@ func main() {
 		log.Fatalf("set up embedded frontend: %v", err)
 	}
 
+	// Attachment text for search, and document previews (ADR 0009).
+	// Without a Tika server the queue just waits; file names are
+	// searchable regardless, and e-mails still preview.
+	var fileIndex interface{ Wake() }
+	var docs httpapi.DocConverter
+	if cfg.TikaURL != "" {
+		tika := &extract.Tika{BaseURL: cfg.TikaURL, Client: &http.Client{}}
+		docs = tika
+		worker := extract.NewWorker(conn, assetsStore, tika, logger)
+		worker.Timeout = cfg.ExtractTimeout
+		go worker.Run(context.Background())
+		fileIndex = worker
+		logger.Info("attachment text extraction on", "tika_url", cfg.TikaURL)
+	} else {
+		logger.Info("NOOK_TIKA_URL not set: attachments are searchable by name only")
+	}
+
 	mux := httpapi.NewMux(httpapi.Deps{
 		Auth:           authHandler,
 		Users:          usersStore,
@@ -177,6 +195,8 @@ func main() {
 		Activity:       activityStore,
 		Archive:        archive.NewStore(conn),
 		Search:         search.NewStore(conn),
+		FileIndex:      fileIndex,
+		Docs:           docs,
 		Collab:         collabStore,
 		CollabHub:      collabHub,
 		Mailer:         mailer,

@@ -833,3 +833,17 @@
   text-decoration-style: dashed;
   cursor: default;
 }
+
+/* "Preview" next to a file block (fileAttachment.ts): opens the file
+   for reading in a new tab (backend preview.go). */
+.editor-content .file-attachment-preview {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.editor-content .file-attachment-preview:hover {
+  color: var(--text);
+}

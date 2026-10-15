@@ -6,6 +6,8 @@
 #   scripts/ui-e2e.sh                 # every suite, both browsers
 #   scripts/ui-e2e.sh database        # one suite (tabs, workspace, history, database)
 #   BROWSERS=chromium scripts/ui-e2e.sh tabs
+#   TIKA=1 scripts/ui-e2e.sh search   # also attachment text and document
+#                                     # previews (needs the nook-tika image)
 #
 # Note: Playwright emulates HTML5 drag-and-drop, so a passing HTML5 drag
 # here doesn't prove a native one starts in Safari; the board and tab
@@ -21,14 +23,21 @@ rm -rf backend/internal/webui/dist && mkdir -p backend/internal/webui/dist && cp
 (cd backend && go build -o "$TMP/nook" ./cmd/nook)
 git checkout -q -- backend/internal/webui/dist/index.html # the tracked placeholder
 
-NOOK_ADDR=127.0.0.1:$PORT NOOK_DB_PATH="$TMP/nook.db" NOOK_UPLOADS_DIR="$TMP/uploads" NOOK_COOKIE_SECURE=false \
+TIKA_ENV=()
+if [ "${TIKA:-}" = 1 ]; then
+  docker run -d --rm --name "nook-ui-e2e-tika-$$" -p 127.0.0.1:19998:9998 nook-tika:latest >/dev/null
+  for _ in $(seq 120); do curl -sf http://127.0.0.1:19998/version >/dev/null && break; sleep 0.5; done
+  TIKA_ENV=(NOOK_TIKA_URL=http://127.0.0.1:19998)
+fi
+
+env "${TIKA_ENV[@]}" NOOK_ADDR=127.0.0.1:$PORT NOOK_DB_PATH="$TMP/nook.db" NOOK_UPLOADS_DIR="$TMP/uploads" NOOK_COOKIE_SECURE=false \
   NOOK_ADMIN_USERNAME=admin NOOK_ADMIN_PASSWORD=e2e-password-123 "$TMP/nook" >"$TMP/server.log" 2>&1 &
 PID=$!
 NAME=nook-ui-e2e-$$
-trap 'docker rm -f "$NAME" >/dev/null 2>&1; kill $PID 2>/dev/null; rm -rf "$TMP"' EXIT
+trap 'docker rm -f "$NAME" "nook-ui-e2e-tika-$$" >/dev/null 2>&1; kill $PID 2>/dev/null; rm -rf "$TMP"' EXIT
 for _ in $(seq 50); do curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null && break; sleep 0.1; done
 
 docker run --rm --name "$NAME" --network host --ipc=host --user "$(id -u):$(id -g)" \
   -v "$PWD/frontend:/w" -v "$TMP:$TMP" -w /w \
-  -e NOOK_URL="http://127.0.0.1:$PORT" -e NOOK_DB="$TMP/nook.db" -e BROWSERS="${BROWSERS:-chromium,webkit}" -e JOBS="${JOBS:-3}" \
+  -e NOOK_URL="http://127.0.0.1:$PORT" -e NOOK_DB="$TMP/nook.db" -e TIKA="${TIKA:-}" -e BROWSERS="${BROWSERS:-chromium,webkit}" -e JOBS="${JOBS:-3}" \
   "$PW_IMAGE" node e2e/ui/run.mjs "$@" || { echo "--- server log"; tail -20 "$TMP/server.log"; exit 1; }

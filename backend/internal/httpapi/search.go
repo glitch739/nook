@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"unicode/utf8"
 
+	"nook/internal/assets"
 	"nook/internal/auth"
 	"nook/internal/httpx"
 	"nook/internal/search"
@@ -29,7 +30,28 @@ type searchResultResponse struct {
 	Title        string  `json:"title"`
 	TitleMarked  string  `json:"title_marked"`
 	Snippet      string  `json:"snippet"`
+	// Files: matching attachments of the page (ADR 0008), best first.
+	Files []searchFileResponse `json:"files"`
 }
+
+// searchFileResponse is one attachment hit under a page. page_no is the
+// PDF page of the match (0: none); url is the file's own URL, the same
+// the editor's file block uses.
+type searchFileResponse struct {
+	FileID      string `json:"file_id"`
+	URL         string `json:"url"`
+	Filename    string `json:"filename"`
+	NameMarked  string `json:"name_marked"`
+	Previewable bool   `json:"previewable"`
+	PageNo      int    `json:"page_no"`
+	Part        string `json:"part"`
+	Snippet     string `json:"snippet"`
+	UsedOCR     bool   `json:"used_ocr"`
+}
+
+// collectionSearchLimit: a collection is meant to hold many pages, so
+// its own filter returns more than the sidebar's global search does.
+const collectionSearchLimit = 200
 
 // searchHandler handles GET /api/search?q=... (RequireAuth-protected):
 // full-text search over every live page the caller can open. Access
@@ -43,7 +65,14 @@ func (a searchAPI) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := auth.UserIDFromContext(r.Context())
-	results, err := a.search.Search(r.Context(), userID, q, search.DefaultLimit)
+	// ?parent= limits the search to one collection's own pages (its
+	// list filter); access is still checked per page inside the query.
+	limit := search.DefaultLimit
+	parent := r.URL.Query().Get("parent")
+	if parent != "" {
+		limit = collectionSearchLimit
+	}
+	results, err := a.search.SearchIn(r.Context(), userID, q, parent, limit)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -51,10 +80,19 @@ func (a searchAPI) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]searchResultResponse, 0, len(results))
 	for _, res := range results {
+		files := make([]searchFileResponse, 0, len(res.Files))
+		for _, f := range res.Files {
+			files = append(files, searchFileResponse{
+				FileID: f.FileID, URL: "/api/pages/" + res.PageID + "/attachments/" + f.FileID,
+				Filename: f.Filename, NameMarked: f.NameMarked,
+				Previewable: assets.IsPreviewable(f.MimeType),
+				PageNo:      f.PageNo, Part: f.Part, Snippet: f.Snippet, UsedOCR: f.UsedOCR,
+			})
+		}
 		out = append(out, searchResultResponse{
 			PageID: res.PageID, SpaceID: res.SpaceID, ParentPageID: res.ParentPageID,
 			Kind: res.Kind, Icon: res.Icon, Title: res.Title,
-			TitleMarked: res.TitleMarked, Snippet: res.Snippet,
+			TitleMarked: res.TitleMarked, Snippet: res.Snippet, Files: files,
 		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)

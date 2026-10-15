@@ -56,6 +56,13 @@ type Config struct {
 	// TrustedProxies: comma-separated IPs/CIDRs of reverse proxies
 	// whose X-Forwarded-For is believed (see httpx.ClientIP).
 	TrustedProxies string
+	// TikaURL is the Apache Tika server that extracts attachment text
+	// for search, OCR included (ADR 0009), e.g. "http://tika:9998".
+	// Empty disables extraction: files are then findable by name only,
+	// and Word/OpenDocument files have no preview.
+	TikaURL string
+	// ExtractTimeout bounds extracting one file (a long scanned PDF).
+	ExtractTimeout time.Duration
 }
 
 var registrationModes = map[string]bool{"open": true, "approval": true, "invite": true, "closed": true}
@@ -78,6 +85,8 @@ func Load() Config {
 		SMTPFrom:       getEnv("NOOK_SMTP_FROM", ""),
 		DevMail:        getEnv("NOOK_DEV_MAIL", ""),
 		TrustedProxies: getEnv("NOOK_TRUSTED_PROXIES", ""),
+		TikaURL:        strings.TrimRight(getEnv("NOOK_TIKA_URL", ""), "/"),
+		ExtractTimeout: getDuration("NOOK_EXTRACT_TIMEOUT", 60*time.Minute),
 	}
 	public := strings.HasPrefix(c.PublicURL, "https://")
 	if c.Registration == "" {
