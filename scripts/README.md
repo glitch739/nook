@@ -62,3 +62,25 @@ empty during normal Nook development — it's most useful when something
 Docker-based is actually running (e.g. while still evaluating
 AFFiNE/AppFlowy-Cloud, or once Nook itself gets a Docker deployment path
 in Phase 6).
+
+## ui-e2e.sh
+
+The UI end-to-end suites (`frontend/e2e/ui/`) in Chromium and WebKit,
+against a throwaway Nook built from this tree: no Docker image build,
+a temporary database, the browsers from the Playwright Docker image.
+
+```bash
+scripts/ui-e2e.sh                          # everything, both browsers (~1.5 min)
+scripts/ui-e2e.sh database                 # one suite: tabs, workspace, history, database
+BROWSERS=chromium scripts/ui-e2e.sh tabs   # one browser (~30 s)
+```
+
+Suites run at the same time (`JOBS`, default 3), each with its own pages
+on the shared server. Shared helpers are in `frontend/e2e/ui/lib.mjs`:
+`session()` (signed-in browser, API calls, page fixtures), `until()`
+(poll instead of fixed sleeps), `mouseDrag()` / `dragByGrip()` (real
+mouse drags). A new check goes into the suite of its area.
+
+Playwright emulates HTML5 drag-and-drop, so a passing HTML5 drag here
+does not prove a native one starts in Safari or Arc; that's why the tab
+bar and the board use pointer events, driven here with a real mouse.

@@ -182,6 +182,11 @@ export interface DatabaseTable {
   // together (plain string comparison) to render both interleaved in
   // the right order.
   title_column_position: string
+  /** The board view's own card order (row ids); rows not in it follow. */
+  board_order: string[]
+  /** The board view's column order per grouping property (option or
+   * user ids, "" for "no value"). Layout only. */
+  board_columns: Record<string, string[]>
 }
 
 // The server's 429 body is terse ("too many requests"); people get a
@@ -269,6 +274,21 @@ export const adminCreateInvite = (i: { email?: string; group_id?: string; role?:
 export const adminDeleteInvite = (id: string) => send('DELETE', `/api/admin/invites/${id}`)
 
 export const pageActivity = (pageId: string) => send<ActivityEntry[]>('GET', `/api/pages/${pageId}/activity`)
+
+// Page history (migration 0019): versions newest first, then one
+// version's document. Restoring is an ordinary edit in the editor.
+export interface PageVersion {
+  id: string
+  created_at: string
+  updated_at: string
+  user_name: string
+}
+export const listVersions = (pageId: string) => send<PageVersion[]>('GET', `/api/pages/${pageId}/versions`)
+export const getVersion = (pageId: string, versionId: string) =>
+  send<{ content_json: string }>('GET', `/api/pages/${pageId}/versions/${versionId}`)
+/** Pages that link to this one (only those the caller can see). */
+export const listBacklinks = (pageId: string) =>
+  send<{ id: string; title: string; icon: string }[]>('GET', `/api/pages/${pageId}/backlinks`)
 
 export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' })
@@ -484,6 +504,11 @@ export function createProperty(
 // new order: every property id, plus TITLE_COLUMN_ID exactly once --
 // see reorderColumnsHandler's own comment on the backend for why (no
 // partial moves, the whole order is sent each drag-and-drop).
+export const setBoardColumns = (pageId: string, propertyId: string, keys: string[]) =>
+  send('PUT', `/api/pages/${pageId}/board-columns`, { property_id: propertyId, keys })
+export const setBoardOrder = (pageId: string, rowIds: string[]) =>
+  send('PUT', `/api/pages/${pageId}/board-order`, { row_ids: rowIds })
+
 export async function reorderColumns(pageId: string, columnIds: string[]): Promise<void> {
   await send('PUT', `/api/pages/${pageId}/columns/order`, { column_ids: columnIds })
 }

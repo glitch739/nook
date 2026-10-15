@@ -20,6 +20,7 @@ import (
 	"nook/internal/archive"
 	"nook/internal/auth"
 	"nook/internal/authtokens"
+	"nook/internal/collab"
 	"nook/internal/databases"
 	"nook/internal/dbtest"
 	"nook/internal/groups"
@@ -66,9 +67,10 @@ func (f *fakeMailer) lastToken(t *testing.T, param string) string {
 }
 
 type testEnv struct {
-	srv   *httptest.Server
-	users *users.Store
-	mail  *fakeMailer
+	srv    *httptest.Server
+	users  *users.Store
+	mail   *fakeMailer
+	collab *collab.Store
 }
 
 func newTestEnv(t *testing.T, registration string) *testEnv {
@@ -80,7 +82,9 @@ func newTestEnv(t *testing.T, registration string) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cs := collab.NewStore(conn)
 	h := NewMux(Deps{
+		Collab: cs,
 		Assets: as,
 		Auth:   auth.NewHandler(us, auth.NewSessionStore(conn), false), Users: us,
 		Spaces: spaces.NewStore(conn), Groups: groups.NewStore(conn), Pages: pages.NewStore(conn),
@@ -92,7 +96,7 @@ func newTestEnv(t *testing.T, registration string) *testEnv {
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &testEnv{srv: srv, users: us, mail: fm}
+	return &testEnv{srv: srv, users: us, mail: fm, collab: cs}
 }
 
 func (e *testEnv) client() *http.Client {

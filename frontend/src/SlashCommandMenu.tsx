@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState } from 'react'
+import { forwardRef, useImperativeHandle, useState, type ReactNode } from 'react'
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
 import type { Editor, Range } from '@tiptap/core'
 
@@ -8,7 +8,7 @@ import type { Editor, Range } from '@tiptap/core'
 export interface SlashCommandItem {
   title: string
   subtitle: string
-  icon: string
+  icon: ReactNode
   run: (editor: Editor, range: Range) => void
 }
 
@@ -70,7 +70,7 @@ const SlashCommandMenu = forwardRef<SlashCommandMenuHandle, SuggestionProps<Slas
         {props.items.map((item, i) => (
           <button
             type="button"
-            key={item.title}
+            key={`${i}-${item.title}`}
             className={i === selected ? 'slash-menu-item active' : 'slash-menu-item'}
             onMouseEnter={() => setSelected(i)}
             onClick={() => props.command(item)}

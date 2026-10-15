@@ -383,3 +383,84 @@ func scanPropertyLike(s rowScanner) (Property, error) {
 	}
 	return p, nil
 }
+
+// BoardOrder returns the database's board card order (row ids), empty
+// when never set.
+func (s *Store) BoardOrder(ctx context.Context, pageID string) ([]string, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT board_order FROM database_settings WHERE page_id = ?;`, pageID).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("databases: get board order: %w", err)
+	}
+	ids := []string{}
+	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
+		return []string{}, nil // unreadable: as if never set
+	}
+	return ids, nil
+}
+
+// SetBoardOrder stores the board card order (validated by the caller).
+func (s *Store) SetBoardOrder(ctx context.Context, pageID string, rowIDs []string) error {
+	raw, err := json.Marshal(rowIDs)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO database_settings (page_id, board_order) VALUES (?, ?)
+		ON CONFLICT (page_id) DO UPDATE SET board_order = excluded.board_order;`, pageID, string(raw))
+	if err != nil {
+		return fmt.Errorf("databases: set board order: %w", err)
+	}
+	return nil
+}
+
+// BoardColumns returns the board's column order per grouping property
+// (property id -> column keys, "" for "no value"), empty when never set.
+func (s *Store) BoardColumns(ctx context.Context, pageID string) (map[string][]string, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT board_columns FROM database_settings WHERE page_id = ?;`, pageID).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return map[string][]string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("databases: get board columns: %w", err)
+	}
+	cols := map[string][]string{}
+	if err := json.Unmarshal([]byte(raw), &cols); err != nil {
+		return map[string][]string{}, nil // unreadable: as if never set
+	}
+	return cols, nil
+}
+
+// SetBoardColumns stores the column order for one grouping property
+// (validated by the caller), keeping the other properties' orders.
+func (s *Store) SetBoardColumns(ctx context.Context, pageID, propertyID string, keys []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("databases: begin board columns: %w", err)
+	}
+	defer tx.Rollback()
+	var raw string
+	err = tx.QueryRowContext(ctx, `SELECT board_columns FROM database_settings WHERE page_id = ?;`, pageID).Scan(&raw)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("databases: get board columns: %w", err)
+	}
+	cols := map[string][]string{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &cols) // unreadable: start over
+	}
+	cols[propertyID] = keys
+	out, err := json.Marshal(cols)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO database_settings (page_id, board_columns) VALUES (?, ?)
+		ON CONFLICT (page_id) DO UPDATE SET board_columns = excluded.board_columns;`, pageID, string(out)); err != nil {
+		return fmt.Errorf("databases: set board columns: %w", err)
+	}
+	return tx.Commit()
+}

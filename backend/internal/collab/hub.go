@@ -319,7 +319,7 @@ func (h *Hub) handle(ctx context.Context, rm *room, c *conn, typ websocket.Messa
 		if !rm.inited || m.Upto <= rm.upto || m.Upto > rm.maxSeq {
 			return nil // stale or premature; another snapshot will come
 		}
-		if err := h.store.Compact(ctx, rm.id, m.Upto, state, m.Content); err != nil {
+		if err := h.store.Compact(ctx, rm.id, m.Upto, state, m.Content, c.userID); err != nil {
 			if errors.Is(err, ErrStaleSnapshot) {
 				return nil
 			}

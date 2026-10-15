@@ -42,6 +42,12 @@ func TestSweep(t *testing.T) {
 		`{"type":"doc","content":[{"type":"image","attrs":{"src":"/api/pages/`+page.ID+`/images/`+pasted.ID+`"}}]}`, other.ID); err != nil {
 		t.Fatal(err)
 	}
+	// Gone from the text, but an older version still shows it.
+	versioned, _ := as.AddImage(ctx, page.ID, bytes.NewReader(png), "versioned.png", u.ID)
+	if _, err := conn.Exec(`INSERT INTO page_versions (id, page_id, content_json) VALUES (?, ?, ?)`, db.NewID(), page.ID,
+		`{"type":"doc","content":[{"type":"image","attrs":{"src":"/api/pages/`+page.ID+`/images/`+versioned.ID+`"}}]}`); err != nil {
+		t.Fatal(err)
+	}
 	att, err := as.AddAttachment(ctx, page.ID, bytes.NewReader([]byte("%PDF")), "doc.pdf", u.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +58,7 @@ func TestSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
-	for _, id := range []string{kept.ID, oldUnused.ID, pasted.ID} {
+	for _, id := range []string{kept.ID, oldUnused.ID, pasted.ID, versioned.ID} {
 		conn.Exec(`UPDATE page_images SET created_at = ? WHERE id = ?`, old, id)
 	}
 	conn.Exec(`UPDATE page_attachments SET created_at = ? WHERE id = ?`, old, att.ID)
@@ -80,7 +86,7 @@ func TestSweep(t *testing.T) {
 	}
 	exists := func(n string) bool { _, err := os.Stat(filepath.Join(dir, n)); return err == nil }
 	for n, want := range map[string]bool{
-		kept.ID: true, pasted.ID: true, newUnused.ID: true, newOrphan: true, "README.txt": true,
+		kept.ID: true, pasted.ID: true, versioned.ID: true, newUnused.ID: true, newOrphan: true, "README.txt": true,
 		oldUnused.ID: false, att.ID: false, oldOrphan: false,
 	} {
 		if exists(n) != want {

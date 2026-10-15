@@ -81,6 +81,7 @@ func (e Exporter) Zip(ctx context.Context, w io.Writer, userID string, now time.
 	}
 	var all []spaceData
 	visible := map[string]bool{}
+	titles := map[string]string{} // the reader's pages, for page links
 	for _, us := range userSpaces {
 		gname, ok := groupName[us.GroupID]
 		if !ok && us.GroupID != "" {
@@ -95,6 +96,7 @@ func (e Exporter) Zip(ctx context.Context, w io.Writer, userID string, now time.
 		}
 		for _, p := range ps {
 			visible[p.ID] = true
+			titles[p.ID] = p.Title
 		}
 		dir := names.child(names.child(root, orDefault(gname, "No group")), orDefault(us.Name, "Space"))
 		all = append(all, spaceData{space: us.Space, dir: dir, pages: ps})
@@ -126,7 +128,7 @@ func (e Exporter) Zip(ctx context.Context, w io.Writer, userID string, now time.
 				}
 				return rel
 			}
-			md, err := e.pageMarkdown(ctx, p, children[p.ID], links)
+			md, err := e.pageMarkdown(ctx, p, children[p.ID], links, func(id string) string { return titles[id] })
 			if err != nil {
 				return err
 			}
@@ -223,7 +225,7 @@ func (e Exporter) addAsset(ctx context.Context, zw *zip.Writer, written map[stri
 
 // pageMarkdown is one page as Markdown: a title heading, a table of rows
 // for a database page, then the page's own text.
-func (e Exporter) pageMarkdown(ctx context.Context, p pages.Page, rows []pages.Page, links Links) (string, error) {
+func (e Exporter) pageMarkdown(ctx context.Context, p pages.Page, rows []pages.Page, links Links, names Names) (string, error) {
 	var b strings.Builder
 	b.WriteString("# " + escape(orDefault(p.Title, "Untitled")) + "\n\n")
 	if p.Kind == pages.KindDatabase {
@@ -234,7 +236,7 @@ func (e Exporter) pageMarkdown(ctx context.Context, p pages.Page, rows []pages.P
 		b.WriteString(table + "\n")
 	}
 	if p.ContentJSON != "" {
-		body, err := Markdown(p.ContentJSON, links)
+		body, err := Markdown(p.ContentJSON, links, names)
 		if err != nil {
 			return "", err
 		}
@@ -363,19 +365,21 @@ func (n namer) child(dir, name string) string {
 }
 
 // PageMarkdown is a single page as Markdown (for "Export as Markdown"):
-// links stay app URLs, which work while signed in.
+// links stay app URLs, which work while signed in. Page links show the
+// current names of pages in the same space (the caller can read it);
+// others keep the name they were linked with.
 func (e Exporter) PageMarkdown(ctx context.Context, p pages.Page) (string, error) {
+	all, err := e.Pages.ListForSpace(ctx, p.SpaceID)
+	if err != nil {
+		return "", err
+	}
 	var rows []pages.Page
-	if p.Kind == pages.KindDatabase {
-		all, err := e.Pages.ListForSpace(ctx, p.SpaceID)
-		if err != nil {
-			return "", err
-		}
-		for _, r := range all {
-			if r.ParentPageID != nil && *r.ParentPageID == p.ID {
-				rows = append(rows, r)
-			}
+	titles := make(map[string]string, len(all))
+	for _, r := range all {
+		titles[r.ID] = r.Title
+		if p.Kind == pages.KindDatabase && r.ParentPageID != nil && *r.ParentPageID == p.ID {
+			rows = append(rows, r)
 		}
 	}
-	return e.pageMarkdown(ctx, p, rows, nil)
+	return e.pageMarkdown(ctx, p, rows, nil, func(id string) string { return titles[id] })
 }

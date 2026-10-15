@@ -58,8 +58,10 @@ func (s *Store) Append(ctx context.Context, pageID string, seq int64, data []byt
 
 // Compact replaces the snapshot with state (which covers every update
 // with seq <= upto), drops those updates, and writes contentJSON as the
-// page's plain-JSON projection -- all in one transaction.
-func (s *Store) Compact(ctx context.Context, pageID string, upto int64, state []byte, contentJSON string) error {
+// page's plain-JSON projection, its history version and its links
+// (history.go) -- all in one transaction. userID sent the snapshot; it
+// is the version's author only when the updates don't name one.
+func (s *Store) Compact(ctx context.Context, pageID string, upto int64, state []byte, contentJSON, userID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -76,6 +78,18 @@ func (s *Store) Compact(ctx context.Context, pageID string, upto int64, state []
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrStaleSnapshot
 	}
+	// The version's author is whoever made the last edit it covers, not
+	// whoever's browser happened to send the snapshot (every open editor
+	// sends them). Read before those updates are pruned below.
+	var last sql.NullString
+	if err := tx.QueryRowContext(ctx, `
+		SELECT user_id FROM page_yupdates WHERE page_id = ? AND seq <= ? AND user_id IS NOT NULL
+		ORDER BY seq DESC LIMIT 1;`, pageID, upto).Scan(&last); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("collab: last editor: %w", err)
+	}
+	if last.Valid {
+		userID = last.String
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM page_yupdates WHERE page_id = ? AND seq <= ?;`, pageID, upto); err != nil {
 		return fmt.Errorf("collab: prune: %w", err)
 	}
@@ -83,6 +97,12 @@ func (s *Store) Compact(ctx context.Context, pageID string, upto int64, state []
 		if _, err := tx.ExecContext(ctx, `UPDATE pages SET content_json = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?;`,
 			contentJSON, pageID); err != nil {
 			return fmt.Errorf("collab: write content_json: %w", err)
+		}
+		if err := recordVersion(ctx, tx, pageID, contentJSON, userID); err != nil {
+			return err
+		}
+		if err := syncLinks(ctx, tx, pageID, contentJSON); err != nil {
+			return err
 		}
 	}
 	return tx.Commit()

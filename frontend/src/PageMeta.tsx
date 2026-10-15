@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { pageActivity, type ActivityEntry, type Page } from './api'
 import './PageMeta.css'
+
+// Only loaded when opened (it brings a second, read-only editor).
+const HistoryModal = lazy(() => import('./HistoryModal'))
 
 const ACTION_LABELS: Record<string, string> = {
   'page.create': 'created it',
@@ -11,7 +14,7 @@ const ACTION_LABELS: Record<string, string> = {
   'row.edit': 'edited a row',
 }
 
-function relativeTime(iso: string): string {
+export function relativeTime(iso: string): string {
   const t = new Date(iso).getTime()
   if (isNaN(t)) return ''
   const s = Math.round((Date.now() - t) / 1000)
@@ -41,6 +44,7 @@ function describe(e: ActivityEntry, pageId: string): string {
 export default function PageMeta({ page, meId }: { page: Page; meId: string }) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   function toggle() {
     const next = !open
@@ -56,6 +60,16 @@ export default function PageMeta({ page, meId }: { page: Page; meId: string }) {
         {page.updated_by ? `Last edited by ${who} · ${relativeTime(page.updated_at)}` : `Edited ${relativeTime(page.updated_at)}`}
         <span className="page-meta-chevron">{open ? '▾' : '▸'}</span>
       </button>
+      {page.kind === 'document' && (
+        <button type="button" className="page-meta-line page-meta-versions" onClick={() => setHistoryOpen(true)}>
+          Versions
+        </button>
+      )}
+      {historyOpen && (
+        <Suspense fallback={null}>
+          <HistoryModal pageId={page.id} onClose={() => setHistoryOpen(false)} />
+        </Suspense>
+      )}
       {open && (
         <ul className="page-activity">
           {entries === null && <li className="hint">Loading…</li>}

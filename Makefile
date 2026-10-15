@@ -13,7 +13,7 @@
 # locally"), which gives instant reload on both sides. This Makefile is
 # for producing the final, single-binary artifact.
 
-.PHONY: build frontend embed clean
+.PHONY: build frontend embed clean collab-e2e ui-e2e
 
 build: embed
 	cd backend && go build -o nook ./cmd/nook
@@ -31,3 +31,6 @@ clean:
 
 collab-e2e:
 	scripts/collab-e2e.sh
+
+ui-e2e:
+	scripts/ui-e2e.sh

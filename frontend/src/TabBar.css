@@ -257,3 +257,40 @@
   font-weight: 600;
 }
 
+
+/* Pulled off the bar towards another pane (Workspace.tsx): the tab stays
+   behind, faded, and a copy of it follows the pointer. */
+.tab-bar-tabs .tab.tab-detached {
+  opacity: 0.35;
+}
+
+.tab.tab-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform: translate(-30%, -50%) rotate(-1.5deg);
+  background: var(--surface-solid);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  animation: tab-ghost-in 120ms ease-out;
+}
+
+@keyframes tab-ghost-in {
+  from {
+    transform: translate(-30%, -50%) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* A pane other than the focused one: its open tab is shown, but quieter. */
+.tab-bar-unfocused .tab.active {
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab.tab-ghost {
+    animation: none;
+  }
+}

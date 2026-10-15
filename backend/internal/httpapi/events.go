@@ -93,14 +93,14 @@ func notifyChanges(hub *events.Hub, next http.Handler) http.Handler {
 
 // affectsData: PUT /api/pages/{row}/properties/{prop} (a cell),
 // POST /api/pages/{db}/properties (new column), PUT
-// /api/pages/{db}/columns/order, PUT/DELETE /api/properties/{prop}
-// (rename, options, delete column).
+// /api/pages/{db}/columns/order, PUT /api/pages/{db}/board-order,
+// PUT/DELETE /api/properties/{prop} (rename, options, delete column).
 func affectsData(p string) bool {
 	if strings.HasPrefix(p, "/api/properties/") {
 		return true
 	}
 	return strings.HasPrefix(p, "/api/pages/") &&
-		(strings.Contains(p, "/properties") || strings.Contains(p, "/columns"))
+		(strings.Contains(p, "/properties") || strings.Contains(p, "/columns") || strings.HasSuffix(p, "/board-order") || strings.HasSuffix(p, "/board-columns"))
 }
 
 func affectsTree(p string) bool {
@@ -108,7 +108,7 @@ func affectsTree(p string) bool {
 		!strings.HasPrefix(p, "/api/groups") && !strings.HasPrefix(p, "/api/archive") {
 		return false
 	}
-	for _, skip := range []string{"/properties", "/cover", "/columns", "/collab", "/rows"} {
+	for _, skip := range []string{"/properties", "/cover", "/columns", "/collab", "/rows", "/board-order", "/board-columns"} {
 		if strings.Contains(p, skip) {
 			return false
 		}

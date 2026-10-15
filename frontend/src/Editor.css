@@ -797,3 +797,39 @@
   font-size: 0.8rem;
 }
 
+
+/* A link to another page in the text (PageMention.tsx). */
+.page-mention {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2em;
+  padding: 0 0.25em;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text) 30%, transparent);
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.page-mention:hover {
+  background: var(--surface-hover);
+}
+
+.page-mention-icon svg {
+  width: 0.95em;
+  height: 0.95em;
+  display: inline-block;
+  vertical-align: -0.12em;
+}
+
+.page-mention.ProseMirror-selectednode {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Removed, or in a space this reader can't open. */
+.page-mention-missing {
+  color: var(--text-muted);
+  text-decoration-style: dashed;
+  cursor: default;
+}

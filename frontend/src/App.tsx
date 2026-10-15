@@ -6,7 +6,6 @@ import {
   createGroup as createGroupApi,
   createPage as createPageApi,
   createSpace as createSpaceApi,
-  getPage,
   logout,
   me,
   verifyEmail,
@@ -22,7 +21,6 @@ import {
   updatePage as updatePageApi,
   updateSpace as updateSpaceApi,
   type ArchivedPage,
-  type Page,
   type PageKind,
   type User,
 } from './api'
@@ -30,13 +28,24 @@ import { urlTokens } from './urlTokens'
 import { notifyError, showToast } from './toast'
 import Toaster from './Toaster'
 import { setCollabUser } from './collabUser'
-import PageCover from './PageCover'
-import PageMeta from './PageMeta'
 import CommandPalette, { type PaletteAction } from './CommandPalette'
 import { downloadUrl } from './download'
-import RowPropertiesBar from './RowPropertiesBar'
 import Sidebar from './Sidebar'
-import TabBar, { type OpenTab } from './TabBar'
+import Workspace from './Workspace'
+import { preloadPageViews } from './PageView'
+import { setPageDirectory } from './pageDirectory'
+import {
+  activePageId,
+  closeTabs as closeLayoutTabs,
+  emptyLayout,
+  joinAll,
+  openTab,
+  panes,
+  parseLayout,
+  prune,
+  splitPane,
+  type Layout,
+} from './layout'
 import {
   atLeast,
   collectPageIds,
@@ -67,21 +76,7 @@ import { useIsMobile } from './useIsMobile'
 import { preloadable } from './preloadable'
 import { usePendingApprovals } from './usePendingApprovals'
 import { emitLiveEvent } from './liveEvents'
-import PageTitle from './PageTitle'
 import './App.css'
-
-// Lazy: both are only needed once a page is actually open (never on the
-// login/auth screen, and DatabaseView specifically only for database-kind
-// pages) -- the editor in particular pulls in Tiptap + all its extensions
-// + Yjs, one of the heaviest parts of the whole bundle, so keeping it out
-// of the initial chunk means an unauthenticated visitor's first paint
-// doesn't pay for it at all.
-const databaseView = preloadable(() => import('./DatabaseView'))
-const editor = preloadable(() => import('./Editor'))
-const collectionView = preloadable(() => import('./CollectionView'))
-const DatabaseView = databaseView.Component
-const Editor = editor.Component
-const CollectionView = collectionView.Component
 
 // Rarely opened screens, also kept out of the initial chunk: Settings
 // (the biggest), the archive, the forced password change, and the
@@ -105,9 +100,7 @@ const AuthScreen = authScreen.Component
 // downloads them nor waits on a Suspense fallback (see preloadable.tsx).
 function preloadPageChunks() {
   const run = () => {
-    editor.preload()
-    databaseView.preload()
-    collectionView.preload()
+    preloadPageViews()
     settings.preload()
     archive.preload()
   }
@@ -151,13 +144,11 @@ export default function App() {
   // below; each TeamSpace's own groupId is what associates it with one
   // of these for rendering (see TeamSpace.groupId's own comment).
   const [groups, setGroups] = useState<SidebarGroup[]>([])
-  const [openTabs, setOpenTabs] = useState<OpenTab[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
-  // The full content (incl. content_json) of whichever page activeId
-  // points to -- loaded separately from the tree/tabs, since those only
-  // carry the slim treeNodeResponse shape (no content_json, see
-  // internal/httpapi/pages.go).
-  const [activePage, setActivePage] = useState<Page | null>(null)
+  // The open pages: panes with their own tabs, side by side or stacked
+  // (layout.ts, drawn by Workspace.tsx). activeId is the page in the
+  // focused pane, the one the sidebar highlights and commands act on.
+  const [layout, setLayout] = useState<Layout>(emptyLayout)
+  const activeId = activePageId(layout)
   // A page created a moment ago opens with its (empty) name focused.
   const [focusTitleId, setFocusTitleId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readStoredSidebarCollapsed)
@@ -165,42 +156,32 @@ export default function App() {
   // its own open/closed state -- closed by default, never persisted,
   // and independent of the desktop collapse preference above.
   const isMobile = useIsMobile()
-  const activeNode = activeId ? findPage(teamspaces, activeId) : null
-  // Viewers see pages read-only: the same editor+ check the server makes.
-  const activeReadOnly = !atLeast(teamspaces.find((t) => t.id === activePage?.space_id)?.role, 'editor')
 
-  // Open tabs survive a refresh: kept per user in this browser and
-  // restored once the sidebar tree has loaded, keeping only pages that
-  // still exist (and taking their current titles/icons from the tree).
-  const tabsKey = user ? `nook-tabs-${user.id}` : null
-  const tabsRestored = useRef(false)
+  // Open panes and tabs survive a refresh: kept per user in this browser
+  // and restored once the sidebar tree has loaded, keeping only pages
+  // that still exist. The older single tab strip (nook-tabs-*) becomes
+  // one pane.
+  const layoutKey = user ? `nook-layout-${user.id}` : null
+  const layoutRestored = useRef(false)
   useEffect(() => {
-    if (!tabsKey || !teamspacesLoaded || tabsRestored.current) return
-    tabsRestored.current = true
+    if (!layoutKey || !user || !teamspacesLoaded || layoutRestored.current) return
+    layoutRestored.current = true
     try {
-      const saved = JSON.parse(localStorage.getItem(tabsKey) ?? 'null') as { tabs: OpenTab[]; active: string | null } | null
-      if (!saved || !Array.isArray(saved.tabs)) return
-      const tabs = saved.tabs
-        .map((t) => {
-          const page = findPage(teamspaces, t.id)
-          return page ? { id: t.id, title: page.title || 'Untitled', icon: page.icon } : null
-        })
-        .filter((t): t is OpenTab => t !== null)
-      if (!tabs.length) return
-      setOpenTabs(tabs)
-      setActiveId(tabs.some((t) => t.id === saved.active) ? saved.active : tabs[0].id)
+      const raw = localStorage.getItem(layoutKey) ?? localStorage.getItem(`nook-tabs-${user.id}`)
+      const saved = parseLayout(JSON.parse(raw ?? 'null'))
+      if (saved) setLayout(prune(saved, (id) => findPage(teamspaces, id) !== null))
     } catch {
       // Unreadable or blocked storage: start with no tabs, as before.
     }
-  }, [tabsKey, teamspacesLoaded, teamspaces])
+  }, [layoutKey, user, teamspacesLoaded, teamspaces])
   useEffect(() => {
-    if (!tabsKey || !tabsRestored.current) return
+    if (!layoutKey || !layoutRestored.current) return
     try {
-      localStorage.setItem(tabsKey, JSON.stringify({ tabs: openTabs, active: activeId }))
+      localStorage.setItem(layoutKey, JSON.stringify(layout))
     } catch {
       // Not persisted; tabs still work for this session.
     }
-  }, [tabsKey, openTabs, activeId])
+  }, [layoutKey, layout])
   const { count: pendingCount, refresh: refreshPending } = usePendingApprovals(user?.is_admin === true)
 
   useEffect(() => {
@@ -214,6 +195,15 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setPaletteOpen((o) => !o)
+      }
+      // Cmd/Ctrl+\ splits the focused pane's page to the right (VS
+      // Code's "Split Editor"); with Shift, downwards.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'Backslash') {
+        e.preventDefault()
+        setLayout((l) => {
+          const id = activePageId(l)
+          return id ? splitPane(l, l.focused, e.shiftKey ? 'bottom' : 'right', id) : l
+        })
       }
     }
     document.addEventListener('keydown', onKey)
@@ -328,27 +318,6 @@ export default function App() {
     }
   }, [status])
 
-  // Load the active page's full content whenever the selected page
-  // changes. Flushes any debounced save for the *previous* page first
-  // (the cleanup function runs before this effect re-runs, and on
-  // unmount) so switching pages quickly never drops the last edit.
-  useEffect(() => {
-    if (!activeId) {
-      setActivePage(null)
-      return
-    }
-    let cancelled = false
-    getPage(activeId)
-      .then((p) => {
-        if (!cancelled) setActivePage(p)
-      })
-      .catch((e) => notifyError('Could not load page', e))
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId])
-
   async function handleLogout() {
     await logout()
     setSettingsOpen(false)
@@ -357,83 +326,29 @@ export default function App() {
     setTeamspaces([])
     setTeamspacesLoaded(false)
     setGroups([])
-    tabsRestored.current = false
-    setOpenTabs([])
-    setActiveId(null)
-    setActivePage(null)
+    layoutRestored.current = false
+    setLayout(emptyLayout())
   }
+
+  // Page links in the editor (PageMention.tsx) read names from the tree
+  // and open pages through here.
+  useEffect(() => setPageDirectory(teamspaces, openPage))
 
   function openPage(id: string) {
     // Picking a page is what the drawer was opened for -- get out of
     // the way so the page is visible.
     setMobileSidebarOpen(false)
-    const page = findPage(teamspaces, id)
-    if (!page) return
-    setOpenTabs((tabs) =>
-      tabs.some((t) => t.id === id) ? tabs : [...tabs, { id, title: page.title, icon: page.icon }],
-    )
-    setActiveId(id)
-  }
-
-  // Purely a local reorder of in-memory UI state -- open tabs aren't
-  // persisted anywhere (see openTabs' own declaration above), so unlike
-  // DatabaseView's column reorder this never needs a backend call.
-  function reorderTabs(draggedId: string, targetId: string) {
-    setOpenTabs((tabs) => {
-      if (draggedId === targetId) return tabs
-      const from = tabs.findIndex((t) => t.id === draggedId)
-      const targetIdx = tabs.findIndex((t) => t.id === targetId)
-      if (from === -1 || targetIdx === -1) return tabs
-      const next = [...tabs]
-      const [moved] = next.splice(from, 1)
-      // Always inserting *before* the target (the previous version of
-      // this) silently no-ops whenever the target is the dragged tab's
-      // immediate right neighbor -- "insert before the tab right after
-      // you" is exactly where you already are, so the single most
-      // natural "nudge it one step right" gesture did nothing. Moving
-      // left never had this problem (inserting before a target to your
-      // left is always a real move). Insert *after* the target instead
-      // whenever the drag came from its left, so dropping on the very
-      // next tab actually swaps them, and dropping on the last tab can
-      // finally land you in the last position too (previously
-      // unreachable -- "before the last tab" tops out one short of it).
-      let insertAt = next.findIndex((t) => t.id === targetId)
-      insertAt = insertAt === -1 ? next.length : from < targetIdx ? insertAt + 1 : insertAt
-      next.splice(insertAt, 0, moved)
-      return next
-    })
-  }
-
-  // Mouse drags in the tab bar (TabBar.tsx) know the exact slot the tab
-  // was dropped into, including after the last tab.
-  function moveTab(draggedId: string, toIndex: number) {
-    setOpenTabs((tabs) => {
-      const from = tabs.findIndex((t) => t.id === draggedId)
-      if (from === -1) return tabs
-      const next = [...tabs]
-      const [moved] = next.splice(from, 1)
-      next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, moved)
-      return next
-    })
+    if (!findPage(teamspaces, id)) return
+    setLayout((l) => openTab(l, id))
   }
 
   function closeTab(id: string) {
     closeTabs(new Set([id]))
   }
 
-  // Closes every tab in ids; if the active one goes, its nearest
-  // surviving neighbor (right, else left) takes over. Reads the current
-  // activeId, not this render's, since callers may run after an await.
+  // Closes these pages in every pane; a pane left empty goes away.
   function closeTabs(ids: Set<string>) {
-    setOpenTabs((tabs) => {
-      const next = tabs.filter((t) => !ids.has(t.id))
-      setActiveId((cur) => {
-        if (!cur || !ids.has(cur)) return cur
-        const kept = tabs.slice(0, tabs.findIndex((t) => t.id === cur)).filter((t) => !ids.has(t.id)).length
-        return (next[kept] ?? next[kept - 1])?.id ?? null
-      })
-      return next
-    })
+    setLayout((l) => closeLayoutTabs(l, ids))
   }
 
   async function handleCreatePage(spaceId: string, parentId: string | null, kind: PageKind) {
@@ -441,10 +356,9 @@ export default function App() {
       const page = await createPageApi(spaceId, { parentPageId: parentId ?? undefined, title: '', kind })
       const node: PageNode = { id: page.id, title: page.title, icon: page.icon, kind: page.kind }
       setTeamspaces((ts) => insertPage(ts, spaceId, parentId, node))
-      setOpenTabs((tabs) => [...tabs, { id: page.id, title: page.title || 'Untitled', icon: page.icon }])
+      setLayout((l) => openTab(l, page.id))
       setMobileSidebarOpen(false)
       setFocusTitleId(page.id)
-      setActiveId(page.id)
     } catch (e) {
       notifyError('Could not create page', e)
     }
@@ -618,8 +532,6 @@ export default function App() {
   async function renamePage(id: string, title: string) {
     if (findPage(teamspaces, id)?.title === title) return
     setTeamspaces((ts) => updatePageInTree(ts, id, (p) => ({ ...p, title })))
-    setOpenTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, title } : t)))
-    if (activePage?.id === id) setActivePage({ ...activePage, title })
     try {
       await updatePageApi(id, { title })
     } catch (e) {
@@ -630,8 +542,6 @@ export default function App() {
   async function changeIcon(id: string, icon: string) {
     if (findPage(teamspaces, id)?.icon === icon) return
     setTeamspaces((ts) => updatePageInTree(ts, id, (p) => ({ ...p, icon })))
-    setOpenTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, icon } : t)))
-    if (activePage?.id === id) setActivePage({ ...activePage, icon })
     try {
       await updatePageApi(id, { icon })
     } catch (e) {
@@ -646,17 +556,10 @@ export default function App() {
       const { teamspaces: ts, groups: gs } = await loadSidebar()
       setTeamspaces(ts)
       setGroups(gs)
-      // Tabs follow the tree: current titles/icons, and pages that are
-      // gone (archived or moved out of reach by someone else) close.
-      setOpenTabs((tabs) =>
-        tabs
-          .map((t) => {
-            const page = findPage(ts, t.id)
-            return page ? { ...t, title: page.title || 'Untitled', icon: page.icon } : null
-          })
-          .filter((t): t is OpenTab => t !== null),
-      )
-      setActiveId((cur) => (cur && findPage(ts, cur) ? cur : null))
+      // Tabs follow the tree (they take titles and icons from it), and
+      // pages that are gone (archived or moved out of reach by someone
+      // else) close.
+      setLayout((l) => prune(l, (id) => findPage(ts, id) !== null))
     } catch (e) {
       console.error('failed to reload the sidebar', e)
     }
@@ -666,10 +569,7 @@ export default function App() {
     setArchiveOpen(false)
     await reloadSidebar()
     setMobileSidebarOpen(false)
-    setOpenTabs((tabs) =>
-      tabs.some((t) => t.id === p.id) ? tabs : [...tabs, { id: p.id, title: p.title || 'Untitled', icon: p.icon }],
-    )
-    setActiveId(p.id)
+    setLayout((l) => openTab(l, p.id))
   }
 
   // The command palette's actions, built from the current state.
@@ -744,6 +644,37 @@ export default function App() {
           run: () => downloadUrl(`/api/pages/${activeId}/export.md`),
         },
         { id: 'close-tab', label: 'Close tab', icon: 'lucide:x', run: () => closeTab(activeId) },
+        {
+          id: 'split-right',
+          label: 'Split right',
+          hint: isMacPlatform() ? '⌘\\' : 'Ctrl \\',
+          icon: 'lucide:columns-2',
+          run: () => setLayout((l) => splitPane(l, l.focused, 'right', activeId)),
+        },
+        {
+          id: 'split-down',
+          label: 'Split down',
+          hint: isMacPlatform() ? '⇧⌘\\' : 'Ctrl ⇧ \\',
+          icon: 'lucide:rows-2',
+          run: () => setLayout((l) => splitPane(l, l.focused, 'bottom', activeId)),
+        },
+      )
+    }
+    const openPanes = panes(layout.root)
+    if (openPanes.length > 1) {
+      list.push(
+        {
+          id: 'next-pane',
+          label: 'Focus next pane',
+          icon: 'lucide:arrow-right-left',
+          run: () =>
+            setLayout((l) => {
+              const all = panes(l.root)
+              const next = all[(all.findIndex((p) => p.id === l.focused) + 1) % all.length]
+              return { ...l, focused: next.id }
+            }),
+        },
+        { id: 'join-panes', label: 'Join all panes', icon: 'lucide:square', run: () => setLayout(joinAll) },
       )
     }
     list.push(
@@ -974,114 +905,39 @@ export default function App() {
           />
         )}
         <div className="workspace">
-          <TabBar
-            tabs={openTabs}
-            activeId={activeId}
-            onSelectTab={setActiveId}
-            onCloseTab={closeTab}
-            onReorderTabs={reorderTabs}
-            onMoveTab={moveTab}
-            sidebarCollapsed={sidebarHidden}
-            onToggleSidebar={() =>
-              isMobile ? setMobileSidebarOpen((o) => !o) : setSidebarCollapsed((c) => !c)
-            }
-            compact={isMobile}
-            userLabel={user.display_name}
-            onOpenSettings={() => {
-              setSettingsTab('profile')
-              setSettingsOpen(true)
+          <Workspace
+            layout={layout}
+            setLayout={setLayout}
+            teamspaces={teamspaces}
+            teamspacesLoaded={teamspacesLoaded}
+            meId={user.id}
+            isMobile={isMobile}
+            focusTitleId={focusTitleId}
+            onTitleFocused={() => setFocusTitleId(null)}
+            actions={{
+              openPage,
+              renamePage,
+              changeIcon,
+              createPage: handleCreatePage,
+              archivePage,
+              createRow: handleCreateRow,
             }}
-            pendingApprovals={pendingCount}
-            onOpenApprovals={() => {
-              setSettingsTab('users')
-              setSettingsOpen(true)
+            bar={{
+              sidebarCollapsed: sidebarHidden,
+              onToggleSidebar: () => (isMobile ? setMobileSidebarOpen((o) => !o) : setSidebarCollapsed((c) => !c)),
+              userLabel: user.display_name,
+              onOpenSettings: () => {
+                setSettingsTab('profile')
+                setSettingsOpen(true)
+              },
+              pendingApprovals: pendingCount,
+              onOpenApprovals: () => {
+                setSettingsTab('users')
+                setSettingsOpen(true)
+              },
+              onLogout: handleLogout,
             }}
-            onLogout={handleLogout}
           />
-          <div className="workspace-body">
-            {/* activePage.id === activeId matters, not just activePage
-                being non-null: getPage(activeId) above is async, so right
-                after switching tabs, activePage still holds the *previous*
-                page's content for one or more renders while the fetch for
-                the new activeId is in flight. Without this check, Editor
-                would mount under the new page's key with the old page's
-                content_json as its initial value -- and since Tiptap only
-                reads `content` once at creation, any edit made in that
-                window would debounce-save the *old* page's content onto
-                the *new* page's id, permanently swapping their content.
-                Showing the loading hint until both actually match closes
-                that window instead of racing it. */}
-            {activeId && activePage && activePage.id === activeId ? (
-              <>
-                <PageCover key={activeId} pageId={activePage.id} readOnly={activeReadOnly} />
-                <PageMeta key={`meta-${activeId}`} page={activePage} meId={user.id} />
-                {/* The tree has the freshest name and icon (a rename in the
-                    sidebar, or one by someone else arriving live); a page
-                    the tree doesn't hold falls back to the loaded copy. */}
-                <PageTitle
-                  key={`title-${activeId}`}
-                  title={activeNode?.title ?? activePage.title}
-                  icon={activeNode?.icon ?? activePage.icon}
-                  autoFocus={focusTitleId === activeId}
-                  readOnly={activeReadOnly}
-                  onAutoFocused={() => setFocusTitleId(null)}
-                  onRename={(title) => void renamePage(activePage.id, title)}
-                  onChangeIcon={(icon) => void changeIcon(activePage.id, icon)}
-                />
-                <Suspense fallback={<p className="hint">Loading…</p>}>
-                  {activePage.kind === 'collection' ? (
-                    <CollectionView
-                      key={activeId}
-                      page={activePage}
-                      readOnly={activeReadOnly}
-                      childrenKey={(activeNode?.children ?? []).map((c) => `${c.id}:${c.title}:${c.icon}`).join('|')}
-                      onOpenPage={openPage}
-                      onCreatePage={handleCreatePage}
-                      onRenamePage={renamePage}
-                      onArchivePage={archivePage}
-                    />
-                  ) : activePage.kind === 'database' ? (
-                    <DatabaseView
-                      key={activeId}
-                      pageId={activePage.id}
-                      spaceId={activePage.space_id}
-                      readOnly={activeReadOnly}
-                      teamspaces={teamspaces}
-                      onCreateRow={handleCreateRow}
-                      onArchiveRow={archivePage}
-                      onRenameRow={renamePage}
-                      onChangeRowIcon={changeIcon}
-                      onOpenPage={openPage}
-                    />
-                  ) : (
-                    <>
-                      {/* A row (ADR 0004) is a plain 'document'-kind page
-                          nested under a 'database' one -- opened as its own
-                          full-page tab here rather than through the row
-                          detail peek, it otherwise showed no trace of the
-                          database's own columns, just the rich-text body. */}
-                      {activePage.parent_page_id &&
-                        findPage(teamspaces, activePage.parent_page_id)?.kind === 'database' && (
-                          <RowPropertiesBar
-                            key={activeId}
-                            rowId={activePage.id}
-                            databasePageId={activePage.parent_page_id}
-                            readOnly={activeReadOnly}
-                          />
-                        )}
-                      <Editor key={activeId} pageId={activePage.id} initialContent={activePage.content_json} />
-                    </>
-                  )}
-                </Suspense>
-              </>
-            ) : (
-              <p className="hint">
-                {teamspacesLoaded
-                  ? 'Pick a page from the sidebar, or create a new one with the "+" button.'
-                  : 'Loading…'}
-              </p>
-            )}
-          </div>
         </div>
       </div>
     )

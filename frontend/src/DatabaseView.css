@@ -728,3 +728,261 @@
   min-width: 2rem;
   padding: 0;
 }
+
+/* Open full page and open beside sit together on the left. */
+.row-detail-toolbar .row-detail-close {
+  margin-left: auto;
+}
+
+/* -- Board (kanban) view (DatabaseBoard.tsx) -- */
+.db-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.db-board-col {
+  flex: 0 0 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  transition:
+    background 120ms,
+    box-shadow 120ms;
+}
+
+.db-board-col-over {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.db-board-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0.25rem;
+  font-size: 0.85rem;
+}
+
+.db-board-none {
+  color: var(--text-muted);
+}
+
+.db-board-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.db-board-card {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 120ms,
+    box-shadow 120ms,
+    opacity 120ms;
+}
+
+.db-board-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.db-board-card-dragging {
+  opacity: 0.4;
+}
+
+.db-board-card .page-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.db-board-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-board-add {
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.db-board-add:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-board-col,
+  .db-board-card {
+    transition: none;
+  }
+}
+
+/* Where a dragged card will land in the board's own order. */
+.db-board-marker {
+  height: 2px;
+  margin: -0.25rem 0.25rem 0.2rem;
+  border-radius: 1px;
+  background: var(--accent);
+  animation: db-board-marker-in 100ms ease-out;
+}
+
+@keyframes db-board-marker-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.db-board-slot {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A card is a div (DatabaseBoard.tsx), with a visible keyboard focus. */
+.db-board-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* The grip a card is dragged by (DatabaseBoard.tsx): shown on hover with
+   a mouse, always on touch screens. touch-action: none keeps a finger
+   on it from scrolling the page instead. */
+.db-board-grip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.4rem;
+  margin-left: -0.3rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.1s ease, background-color 0.1s ease;
+}
+
+.db-board-card:hover .db-board-grip,
+.db-board-card:focus-visible .db-board-grip {
+  opacity: 1;
+}
+
+.db-board-grip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+@media (hover: none) {
+  .db-board-grip {
+    opacity: 1;
+    width: 1.6rem;
+    height: 1.8rem;
+  }
+}
+
+/* The card under the pointer while it's dragged; the original stays in
+   place, faded (.db-board-card-dragging). */
+.db-board-card.db-board-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: rotate(-1.5deg);
+  cursor: grabbing;
+}
+
+.db-board-ghost .db-board-grip {
+  opacity: 1;
+}
+
+/* While a board card is dragged: no text selection, a closed hand. */
+body.board-dragging {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* The card count: just its width (.workspace-body .hint is full width),
+   so a long column name doesn't wrap. */
+.db-board-col-head .hint {
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* Board columns move by a grip in their header (DatabaseBoard.tsx). */
+.db-board-col-grip {
+  margin-left: -0.15rem;
+  margin-right: -0.2rem;
+}
+
+.db-board-col-head:hover .db-board-col-grip {
+  opacity: 1;
+}
+
+.db-board-col-head {
+  justify-content: flex-start;
+}
+
+.db-board-col-head .hint {
+  width: auto;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.db-board-col-dragging {
+  opacity: 0.4;
+}
+
+/* Where a dragged column will go. */
+.db-board-col-marker {
+  flex: 0 0 3px;
+  align-self: stretch;
+  margin: 0 -0.45rem;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: db-board-marker-in 100ms ease-out;
+}
+
+.db-board-col.db-board-col-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: rotate(-1deg);
+}
+
+.db-board-col-ghost .db-board-grip {
+  opacity: 1;
+}
+
+.db-board-col.db-board-col-ghost {
+  background: var(--surface-solid);
+}

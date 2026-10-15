@@ -219,6 +219,14 @@ func NewMux(deps Deps) http.Handler {
 	mux.Handle("DELETE /api/pages/{pageID}",
 		deps.Auth.RequireAuth(http.HandlerFunc(pagesAPI.archivePageHandler)))
 
+	// Page history and links between pages (migration 0019).
+	if deps.Collab != nil {
+		hist := historyAPI{pages: pagesAPI, collab: deps.Collab}
+		mux.Handle("GET /api/pages/{pageID}/versions", deps.Auth.RequireAuth(http.HandlerFunc(hist.versionsHandler)))
+		mux.Handle("GET /api/pages/{pageID}/versions/{versionID}", deps.Auth.RequireAuth(http.HandlerFunc(hist.versionHandler)))
+		mux.Handle("GET /api/pages/{pageID}/backlinks", deps.Auth.RequireAuth(http.HandlerFunc(hist.backlinksHandler)))
+	}
+
 	// Sidebar full-text search (ADR 0007).
 	searchAPI := searchAPI{search: deps.Search}
 	mux.Handle("GET /api/search",
@@ -233,6 +241,10 @@ func NewMux(deps Deps) http.Handler {
 		deps.Auth.RequireAuth(http.HandlerFunc(databasesAPI.peopleHandler)))
 	mux.Handle("POST /api/pages/{pageID}/properties",
 		maxBody(propertyBodyLimit)(deps.Auth.RequireAuth(http.HandlerFunc(databasesAPI.createPropertyHandler))))
+	mux.Handle("PUT /api/pages/{pageID}/board-columns",
+		maxBody(pageOrderBodyLimit)(deps.Auth.RequireAuth(http.HandlerFunc(databasesAPI.boardColumnsHandler))))
+	mux.Handle("PUT /api/pages/{pageID}/board-order",
+		maxBody(boardOrderBodyLimit)(deps.Auth.RequireAuth(http.HandlerFunc(databasesAPI.boardOrderHandler))))
 	mux.Handle("PUT /api/pages/{pageID}/columns/order",
 		maxBody(propertyBodyLimit)(deps.Auth.RequireAuth(http.HandlerFunc(databasesAPI.reorderColumnsHandler))))
 	mux.Handle("PUT /api/properties/{propertyID}",

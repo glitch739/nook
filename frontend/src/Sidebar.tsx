@@ -10,7 +10,7 @@ import SidebarSearch from './SidebarSearch'
 import Collapse from './Collapse'
 import { usePresence } from './usePresence'
 import { startPointerDrag } from './pointerDrag'
-import { endExternalPageDrag, externalPageDrag } from './pageDrag'
+import { endExternalPageDrag, endSidebarPageDrag, externalPageDrag, startSidebarPageDrag } from './pageDrag'
 import './Sidebar.css'
 
 // Touch screens (no hover): the grips are hidden there and too small to
@@ -1486,6 +1486,7 @@ export default function Sidebar({
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', pageId)
       setDraggedPageId(pageId)
+      startSidebarPageDrag(pageId)
     }
   }
 
@@ -1551,6 +1552,7 @@ export default function Sidebar({
   }
 
   function handlePageDragEnd() {
+    endSidebarPageDrag()
     setDraggedPageId(null)
     setPageDropTarget(null)
   }

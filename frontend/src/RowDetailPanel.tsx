@@ -26,6 +26,8 @@ export default function RowDetailPanel({
   values,
   onClose,
   onOpenFullPage,
+  onOpenBeside,
+  container,
   closing,
   onExited,
   onRenameRow,
@@ -47,6 +49,11 @@ export default function RowDetailPanel({
   // Opens this row as a full page in its own tab (the same as clicking
   // it in the sidebar), so the pointer doesn't have to travel there.
   onOpenFullPage: () => void
+  /** Opens the row in a new pane beside the table (split workspace). */
+  onOpenBeside?: () => void
+  /** The pane the table is in: rendered into it, so in a split it slides
+   * in over that pane only (App.css); otherwise it's fixed to the window. */
+  container?: HTMLElement | null
   onRenameRow: (title: string) => void
   onChangeRowIcon: (icon: string) => void
   onPropertyChange: (propertyId: string, value: unknown) => void
@@ -104,7 +111,8 @@ export default function RowDetailPanel({
       cursor: 'ew-resize',
       // Anchored to the right edge: dragging left (negative dx) widens it.
       onMove: (dx) => {
-        const maxWidth = window.innerWidth * MAX_PANEL_WIDTH_RATIO
+        const split = container?.closest('.workspace-grid-split')
+        const maxWidth = (split && container ? container.clientWidth : window.innerWidth) * MAX_PANEL_WIDTH_RATIO
         setPanelWidth(Math.min(maxWidth, Math.max(MIN_PANEL_WIDTH, startWidth - dx)))
       },
     })
@@ -113,7 +121,8 @@ export default function RowDetailPanel({
   // Portaled to document.body, same reasoning as Popover.tsx: a side
   // peek that's supposed to float over the whole app (table, tab bar,
   // sidebar) can't be a DOM descendant of .database-view without an
-  // ancestor's overflow/stacking context fighting it.
+  // ancestor's overflow/stacking context fighting it. In a split it
+  // goes into its own pane instead, so it never covers the others.
   return createPortal(
     <div
       className={closing ? 'row-detail-panel row-detail-panel-closing' : 'row-detail-panel'}
@@ -148,6 +157,30 @@ export default function RowDetailPanel({
             <path d="M9 21H3v-6" />
           </svg>
         </button>
+        {onOpenBeside && (
+          <button
+            type="button"
+            className="row-detail-open-full"
+            onClick={onOpenBeside}
+            title="Open beside the table"
+            aria-label="Open beside the table"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M12 3v18" />
+            </svg>
+          </button>
+        )}
         <button type="button" className="row-detail-close" onClick={onClose} aria-label="Close">
           ×
         </button>
@@ -192,6 +225,6 @@ export default function RowDetailPanel({
         )}
       </div>
     </div>,
-    document.body,
+    container ?? document.body,
   )
 }

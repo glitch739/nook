@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import PageIcon from './PageIcon'
 import Popover from './Popover'
 import './TabBar.css'
@@ -32,6 +33,14 @@ export default function TabBar({
   compact,
   pendingApprovals,
   onOpenApprovals,
+  paneId,
+  focused = true,
+  showToggle = true,
+  showAccount = true,
+  onDragOut,
+  onDropOut,
+  onDragOutEnd,
+  onTabMenu,
 }: {
   tabs: OpenTab[]
   activeId: string | null
@@ -51,6 +60,23 @@ export default function TabBar({
   /** Admins only: sign-ups waiting for approval (0 hides the badge). */
   pendingApprovals: number
   onOpenApprovals: () => void
+  /** The workspace pane this bar belongs to (Workspace.tsx). */
+  paneId?: string
+  /** False for a pane other than the focused one: its active tab dims. */
+  focused?: boolean
+  /** In a split only the top-left bar has the sidebar toggle and only
+   * the top-right one the account controls. */
+  showToggle?: boolean
+  showAccount?: boolean
+  /** A mouse drag left this bar (pulled off it, or over another pane):
+   * the workspace shows where the tab would land at (x, y). */
+  onDragOut?: (tabId: string, x: number, y: number) => void
+  /** Released while out: the workspace places the tab. */
+  onDropOut?: (tabId: string) => void
+  /** The drag came back to this bar or ended: clear the drop marker. */
+  onDragOutEnd?: () => void
+  /** Right-click on a tab. */
+  onTabMenu?: (tabId: string, anchor: HTMLElement) => void
 }) {
   const pendingLabel = `${pendingApprovals} sign-up${pendingApprovals === 1 ? '' : 's'} awaiting approval`
   const [accountAnchor, setAccountAnchor] = useState<HTMLButtonElement | null>(null)
@@ -67,9 +93,17 @@ export default function TabBar({
   // The mouse drag in progress: which tab, how far it has moved (dx),
   // where it started (from) and which slot it would land in (slot), and
   // how far its neighbors move aside (shift: its width plus the gap).
-  const [lift, setLift] = useState<{ id: string; dx: number; from: number; slot: number; shift: number } | null>(
-    null,
-  )
+  const [lift, setLift] = useState<{
+    id: string
+    dx: number
+    from: number
+    slot: number
+    shift: number
+    /** Pulled off the bar: the tab stays in place, dimmed, and a copy of
+     * it (ghost) follows the pointer over the workspace. */
+    out: boolean
+  } | null>(null)
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null)
   // One render with no transitions, right after a drop: the tabs then
   // swap their slide-aside offsets for their real new positions, which
   // must not animate.
@@ -128,6 +162,10 @@ export default function TabBar({
       let barRect = container.getBoundingClientRect()
       let startContentX = 0
       let current: { dx: number; slot: number } = { dx: 0, slot: -1 }
+      // Off the bar: over the rest of the workspace (another pane's tabs,
+      // or a pane's body), where Workspace.tsx picks the drop target.
+      let out = false
+      let pos = { x: startX, y: startY }
       let raf: number | null = null
       const body = document.body.style
       const prevSelect = body.userSelect
@@ -169,16 +207,43 @@ export default function TabBar({
           if (i !== from && s.left + s.width / 2 < center) slot++
         })
         current = { dx, slot }
-        if (raf === null) {
-          raf = requestAnimationFrame(() => {
-            raf = null
-            setLift({ id: tabId, dx: current.dx, from, slot: current.slot, shift })
-          })
-        }
+        schedule()
+      }
+
+      // One state update per frame, whatever the event rate.
+      const schedule = () => {
+        if (raf !== null) return
+        raf = requestAnimationFrame(() => {
+          raf = null
+          setLift({ id: tabId, dx: out ? 0 : current.dx, from, slot: out ? from : current.slot, shift, out })
+          setGhost(out ? { ...pos } : null)
+        })
+      }
+
+      // Off the bar: more than a little above or below it, or over
+      // another pane (a pane beside this one has its tabs at the same
+      // height, so the band alone can't tell).
+      const isOut = (x: number, y: number) => {
+        if (!onDragOut) return false
+        if (y < barRect.top - 16 || y > barRect.bottom + 16) return true
+        const pane = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-pane-id]')
+        return !!pane && pane.dataset.paneId !== paneId
       }
 
       const move = (ev: PointerEvent) => {
         if (ev.pointerId !== pointerId) return
+        // Button already up but its pointerup never reached us (released
+        // outside the window, focus switch): end the drag instead of
+        // letting the tab stick to the cursor until the next click drops it.
+        if ((ev.buttons & 1) === 0) {
+          finish(false)
+          return
+        }
+        // Safari in full screen on a second display sends a stray move at
+        // a fixed offset (seen: -776, +2390) right after the press; taken
+        // as real, it turned clicks into drags. Outside the window is never
+        // a useful slot anyway.
+        if (ev.clientX < 0 || ev.clientY < 0 || ev.clientX > window.innerWidth || ev.clientY > window.innerHeight) return
         if (!dragging) {
           if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
           if (!begin()) {
@@ -187,16 +252,30 @@ export default function TabBar({
           }
           dragging = true
         }
+        pos = { x: ev.clientX, y: ev.clientY }
+        if (isOut(ev.clientX, ev.clientY)) {
+          out = true
+          onDragOut?.(tabId, ev.clientX, ev.clientY)
+          schedule()
+          return
+        }
+        if (out) {
+          out = false
+          onDragOutEnd?.()
+        }
         update(ev.clientX)
       }
 
       const finish = (drop: boolean) => {
+        // Before stop(): it clears the workspace's drop target.
+        if (dragging && out && drop) onDropOut?.(tabId)
         stop()
         if (!dragging) return
         suppressClick.current = true
         // A click only follows a release over the same element; clear the
         // flag in case none comes.
         window.setTimeout(() => (suppressClick.current = false), 0)
+        if (out) return
         if (drop && current.slot !== from) {
           const el = container.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(tabId)}"]`)
           if (el) settleFrom.current = { id: tabId, left: el.getBoundingClientRect().left }
@@ -210,6 +289,7 @@ export default function TabBar({
       const key = (ev: KeyboardEvent) => {
         if (ev.key === 'Escape') finish(false)
       }
+      const cancel = () => finish(false)
       const stop = () => {
         if (raf !== null) cancelAnimationFrame(raf)
         raf = null
@@ -217,14 +297,17 @@ export default function TabBar({
         window.removeEventListener('pointerup', up)
         window.removeEventListener('pointercancel', up)
         window.removeEventListener('keydown', key)
+        window.removeEventListener('blur', cancel)
         try {
           source.releasePointerCapture(pointerId)
         } catch {
           // Already released.
         }
+        if (out) onDragOutEnd?.()
         body.userSelect = prevSelect
         body.cursor = prevCursor
         setLift(null)
+        setGhost(null)
         setDraggedTabId(null)
         setDropTargetTabId(null)
         stopPointerDrag.current = null
@@ -235,6 +318,8 @@ export default function TabBar({
       window.addEventListener('pointerup', up)
       window.addEventListener('pointercancel', up)
       window.addEventListener('keydown', key)
+      // Switching window/app mid-press swallows the pointerup.
+      window.addEventListener('blur', cancel)
     }
   }
 
@@ -282,7 +367,8 @@ export default function TabBar({
   }
 
   return (
-    <div className="tab-bar">
+    <div className={focused ? 'tab-bar' : 'tab-bar tab-bar-unfocused'}>
+      {showToggle && (
       <button
         className="tab-bar-toggle"
         onClick={onToggleSidebar}
@@ -310,9 +396,11 @@ export default function TabBar({
           />
         </svg>
       </button>
+      )}
 
       <div
         ref={tabsRef}
+        data-pane-tabs={paneId}
         className={['tab-bar-tabs', lift && 'tab-bar-tabs-dragging', settling && 'tab-bar-tabs-settling']
           .filter(Boolean)
           .join(' ')}
@@ -323,7 +411,7 @@ export default function TabBar({
             className={[
               'tab',
               tab.id === activeId && 'active',
-              lift?.id === tab.id && 'tab-lifted',
+              lift?.id === tab.id && (lift.out ? 'tab-detached' : 'tab-lifted'),
               !lift && tab.id === draggedTabId && 'tab-dragging',
               tab.id === dropTargetTabId && 'tab-drop-target',
             ]
@@ -341,7 +429,12 @@ export default function TabBar({
             // Text selection and the native drag of the icon would start
             // on a mouse press and take the gesture over (Safari).
             onMouseDown={(e) => {
-              if (!TOUCH_DRAG && e.button === 0) e.preventDefault()
+              // Button 1 too: a middle press would start autoscroll.
+              if ((!TOUCH_DRAG && e.button === 0) || e.button === 1) e.preventDefault()
+            }}
+            // Middle click closes, as in browsers and VS Code.
+            onAuxClick={(e) => {
+              if (e.button === 1) onCloseTab(tab.id)
             }}
             draggable={TOUCH_DRAG || undefined}
             onDragStart={TOUCH_DRAG ? handleDragStart(tab.id) : (e) => e.preventDefault()}
@@ -349,6 +442,14 @@ export default function TabBar({
             onDragLeave={TOUCH_DRAG ? () => setDropTargetTabId((cur) => (cur === tab.id ? null : cur)) : undefined}
             onDrop={TOUCH_DRAG ? handleDrop(tab.id) : undefined}
             onDragEnd={TOUCH_DRAG ? handleDragEnd : undefined}
+            onContextMenu={
+              onTabMenu
+                ? (e) => {
+                    e.preventDefault()
+                    onTabMenu(tab.id, e.currentTarget)
+                  }
+                : undefined
+            }
             onClick={() => {
               if (suppressClick.current) {
                 suppressClick.current = false
@@ -377,7 +478,17 @@ export default function TabBar({
         ))}
       </div>
 
-      {compact ? (
+      {ghost &&
+        lift &&
+        createPortal(
+          <div className="tab tab-ghost" style={{ left: ghost.x, top: ghost.y }} aria-hidden="true">
+            <PageIcon icon={tabs.find((t) => t.id === lift.id)?.icon ?? ''} className="tab-icon" />
+            <span className="tab-title">{tabs.find((t) => t.id === lift.id)?.title}</span>
+          </div>,
+          document.body,
+        )}
+
+      {!showAccount ? null : compact ? (
         <>
           <button
             className="tab-bar-account"

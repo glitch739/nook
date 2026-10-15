@@ -18,3 +18,22 @@ export function endExternalPageDrag() {
 export function externalPageDrag(): string | null {
   return externalPageId
 }
+
+// A page dragged from the sidebar, for the workspace's panes
+// (Workspace.tsx): dropped on a pane it opens there, on a pane's edge in
+// a new pane. Same reason as above: dataTransfer is unreadable until the
+// drop, and the pane shows where it would land while hovering.
+let sidebarPageId: string | null = null
+
+export function startSidebarPageDrag(pageId: string) {
+  sidebarPageId = pageId
+}
+
+export function endSidebarPageDrag() {
+  sidebarPageId = null
+}
+
+/** The page being dragged from the sidebar or a collection, if any. */
+export function draggedPage(): string | null {
+  return sidebarPageId ?? externalPageId
+}

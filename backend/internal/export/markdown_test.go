@@ -21,7 +21,7 @@ func TestMarkdown(t *testing.T) {
 			return "_files/i-pic.png"
 		}
 		return ""
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,5 +35,18 @@ func TestMarkdown(t *testing.T) {
 		"| A | B\\|C |\n| --- | --- |\n| 1 |  |\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestMarkdownPageMention(t *testing.T) {
+	got, err := Markdown(`{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"see "},{"type":"pageMention","attrs":{"id":"x","label":"Plan_B"}}]}]}`, nil, nil)
+	if err != nil || got != "see @Plan\\_B\n" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	// The current name wins; an unknown page keeps the linked one.
+	doc := `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"pageMention","attrs":{"id":"x","label":"Old"}},{"type":"text","text":" "},{"type":"pageMention","attrs":{"id":"y","label":"Hidden"}}]}]}`
+	names := func(id string) string { return map[string]string{"x": "New"}[id] }
+	if got, _ := Markdown(doc, nil, names); got != "@New @Hidden\n" {
+		t.Fatalf("got %q", got)
 	}
 }

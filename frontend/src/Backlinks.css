@@ -1,0 +1,49 @@
+/* "Linked from" under a page (Backlinks.tsx). */
+.backlinks {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.backlinks h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backlinks ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.backlinks button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.backlinks button:hover {
+  background: var(--surface-hover);
+}
+
+.backlinks .page-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}

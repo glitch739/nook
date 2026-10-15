@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createProperty as createPropertyApi,
   deleteProperty as deletePropertyApi,
   listRows,
   reorderColumns as reorderColumnsApi,
+  setBoardOrder as setBoardOrderApi,
+  setBoardColumns as setBoardColumnsApi,
   setRowProperty as setRowPropertyApi,
   TITLE_COLUMN_ID,
   updateProperty as updatePropertyApi,
@@ -14,7 +16,7 @@ import {
   type SelectOption,
 } from './api'
 import { notifyError } from './toast'
-import { applyView, readColumnWidths, readDbView, saveColumnWidths, saveDbView } from './dbView'
+import { applyView, boardKey, boardValue, moveInBoardOrder, readColumnWidths, readDbView, saveColumnWidths, saveDbView } from './dbView'
 import { useLiveRefresh, useLocalWrites } from './liveEvents'
 import { usePresence } from './usePresence'
 import { startPointerDrag } from './pointerDrag'
@@ -23,6 +25,7 @@ import PageIcon from './PageIcon'
 import Popover from './Popover'
 import PropertyCell from './PropertyCell'
 import RowDetailPanel from './RowDetailPanel'
+import DatabaseBoard from './DatabaseBoard'
 import { findPage, type PageNode, type TeamSpace } from './sidebarData'
 
 // Row peek slide-out; keep in sync with .row-detail-panel-closing.
@@ -493,6 +496,7 @@ export default function DatabaseView({
   onRenameRow,
   onChangeRowIcon,
   onOpenPage,
+  onOpenBeside,
   readOnly = false,
 }: {
   /** A viewer: the table shows, nothing in it is editable. */
@@ -509,6 +513,8 @@ export default function DatabaseView({
   onRenameRow: (rowId: string, title: string) => void
   onChangeRowIcon: (rowId: string, icon: string) => void
   onOpenPage: (pageId: string) => void
+  /** Opens a row in a new pane beside this one (split workspace). */
+  onOpenBeside?: (pageId: string) => void
 }) {
   const [table, setTable] = useState<DatabaseTable | null>(null)
   const [openRowId, setOpenRowId] = useState<string | null>(null)
@@ -517,6 +523,10 @@ export default function DatabaseView({
   // there's still something to show.
   const panelPresence = usePresence(openRowId !== null, ROW_PANEL_EXIT_MS)
   const [panelRowId, setPanelRowId] = useState<string | null>(null)
+  // The pane this table is in: the row panel goes there, and CSS keeps
+  // it over that pane only while the workspace is split (App.css).
+  const [paneBody, setPaneBody] = useState<HTMLElement | null>(null)
+  const rootRef = useCallback((el: HTMLDivElement | null) => setPaneBody(el?.closest<HTMLElement>('.pane-body') ?? null), [])
   if (openRowId !== null && openRowId !== panelRowId) setPanelRowId(openRowId)
   const [addPropertyAnchor, setAddPropertyAnchor] = useState<HTMLButtonElement | null>(null)
   const addPropertyBtnRef = useRef<HTMLButtonElement>(null)
@@ -605,11 +615,13 @@ export default function DatabaseView({
     return node ? { icon: node.icon, title: node.title } : { icon: row.icon, title: row.title }
   }
 
-  async function handleAddRow() {
+  // preset: a value to start with (a board column's option).
+  async function handleAddRow(preset?: { propertyId: string; value: unknown }) {
     const created = await writes.track(onCreateRow(spaceId, pageId, ''))
     if (!created) return
     const newRow: Row = { id: created.id, title: created.title, icon: created.icon, position: '', values: {} }
     setTable((t) => (t ? { ...t, rows: [...t.rows, newRow] } : t))
+    if (preset) handleCellChange(newRow.id, preset.propertyId, preset.value)
     setOpenRowId(newRow.id)
   }
 
@@ -785,6 +797,10 @@ export default function DatabaseView({
   const columnIds = sortedColumnIds(table)
   const propertiesById = new Map(table.properties.map((p) => [p.id, p]))
   const shownRows = applyView(table.rows, table.properties, view, (r) => rowDisplay(r).title)
+  // Columns a board can group by: status-like selects and people.
+  const boardProps = table.properties.filter((p) => p.type === 'select' || p.type === 'person')
+  // A board whose column was deleted or changed type falls back to the table.
+  const boardProp = boardProps.find((p) => p.id === view.board)
 
   function columnDragProps(columnId: string) {
     return {
@@ -816,9 +832,28 @@ export default function DatabaseView({
   }
 
   return (
-    <div className="database-view">
+    <div
+      className="database-view"
+      ref={rootRef}
+    >
       <div className="database-main">
         <div className="db-view-bar">
+          {/* Table, or a board grouped by one of the select columns. */}
+          {boardProps.length > 0 && (
+            <select
+              className="db-view-sort"
+              aria-label="View"
+              value={boardProp?.id ?? ''}
+              onChange={(e) => setView({ ...view, board: e.target.value || null })}
+            >
+              <option value="">Table</option>
+              {boardProps.map((p) => (
+                <option key={p.id} value={p.id}>
+                  Board: {p.name}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             className="db-view-filter"
             type="search"
@@ -856,92 +891,120 @@ export default function DatabaseView({
             </span>
           )}
         </div>
-        <div className="database-table-wrap">
-          <table className="database-table">
-            <colgroup>
-              {columnIds.map((id) => (
-                <col key={id} style={{ width: columnWidth(id) }} />
-              ))}
-              <col style={{ width: ADD_COLUMN_WIDTH }} />
-            </colgroup>
-            <thead>
-              <tr>
-                {columnIds.map((id) =>
-                  id === TITLE_COLUMN_ID ? (
-                    <TitleColumnHeader key={id} readOnly={readOnly} {...columnDragProps(id)} {...columnResizeProps(id)} />
-                  ) : (
-                    <ColumnHeader
-                      key={id}
-                      readOnly={readOnly}
-                      property={propertiesById.get(id)!}
-                      onRename={(name) => handleRenameProperty(id, name)}
-                      onDelete={() => handleDeleteProperty(id)}
-                      {...columnDragProps(id)}
-                      {...columnResizeProps(id)}
-                    />
-                  ),
-                )}
-                <th className="db-th db-th-add">
-                  <button
-                    ref={addPropertyBtnRef}
-                    type="button"
-                    hidden={readOnly}
-                    className="db-add-column-btn"
-                    onClick={() => setAddPropertyAnchor(addPropertyBtnRef.current)}
-                    title="New column"
-                    aria-label="New column"
-                  >
-                    +
-                  </button>
-                  {addPropertyAnchor && (
-                    <AddPropertyMenu
-                      anchorEl={addPropertyAnchor}
-                      onCreate={handleAddProperty}
-                      onClose={() => setAddPropertyAnchor(null)}
-                    />
-                  )}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shownRows.map((row) => {
-                const display = rowDisplay(row)
-                return (
-                <tr key={row.id} className="db-tr">
+        {boardProp ? (
+          <DatabaseBoard
+            rows={shownRows}
+            property={boardProp}
+            // The board's own order applies unless the view is sorted.
+            order={view.sortBy ? undefined : (table.board_order ?? [])}
+            display={rowDisplay}
+            readOnly={readOnly}
+            onOpen={(id) => setOpenRowId(id)}
+            onDrop={(rowId, key, beforeId) => {
+              const row = table.rows.find((r) => r.id === rowId)
+              if (row && boardKey(row, boardProp) !== key) handleCellChange(rowId, boardProp.id, boardValue(boardProp, key))
+              if (beforeId === undefined) return
+              const next = moveInBoardOrder(table.board_order ?? [], table.rows.map((r) => r.id), rowId, beforeId)
+              setTable((t) => (t ? { ...t, board_order: next } : t))
+              writes.track(setBoardOrderApi(pageId, next)).catch((e) => notifyError('Could not save the board order', e))
+            }}
+            columnOrder={table.board_columns?.[boardProp.id]}
+            onMoveColumns={(keys) => {
+              setTable((t) => (t ? { ...t, board_columns: { ...t.board_columns, [boardProp.id]: keys } } : t))
+              writes.track(setBoardColumnsApi(pageId, boardProp.id, keys)).catch((e) => notifyError('Could not save the column order', e))
+            }}
+            onAdd={(key) =>
+              void handleAddRow(key ? { propertyId: boardProp.id, value: boardValue(boardProp, key) } : undefined)
+            }
+          />
+        ) : (
+          <div className="database-table-wrap">
+            <table className="database-table">
+              <colgroup>
+                {columnIds.map((id) => (
+                  <col key={id} style={{ width: columnWidth(id) }} />
+                ))}
+                <col style={{ width: ADD_COLUMN_WIDTH }} />
+              </colgroup>
+              <thead>
+                <tr>
                   {columnIds.map((id) =>
                     id === TITLE_COLUMN_ID ? (
-                      <td key={id} className={`${cellDragClass(id)} db-td-title`}>
-                        <TitleCell
-                          readOnly={readOnly}
-                          icon={display.icon}
-                          title={display.title}
-                          onOpen={() => setOpenRowId(row.id)}
-                          onRename={(title) => handleRenameRow(row.id, title)}
-                          onArchive={() => handleArchiveRow(row.id)}
-                        />
-                      </td>
+                      <TitleColumnHeader key={id} readOnly={readOnly} {...columnDragProps(id)} {...columnResizeProps(id)} />
                     ) : (
-                      <td key={id} className={cellDragClass(id)}>
-                        <PropertyCell
-                          property={propertiesById.get(id)!}
-                          value={row.values[id]}
-                          onChange={(v) => handleCellChange(row.id, id, v)}
-                          onOptionsChanged={(options) => handleOptionsChanged(id, options)}
-                          readOnly={readOnly}
-                        />
-                      </td>
+                      <ColumnHeader
+                        key={id}
+                        readOnly={readOnly}
+                        property={propertiesById.get(id)!}
+                        onRename={(name) => handleRenameProperty(id, name)}
+                        onDelete={() => handleDeleteProperty(id)}
+                        {...columnDragProps(id)}
+                        {...columnResizeProps(id)}
+                      />
                     ),
                   )}
-                  <td className="db-td db-td-add" />
+                  <th className="db-th db-th-add">
+                    <button
+                      ref={addPropertyBtnRef}
+                      type="button"
+                      hidden={readOnly}
+                      className="db-add-column-btn"
+                      onClick={() => setAddPropertyAnchor(addPropertyBtnRef.current)}
+                      title="New column"
+                      aria-label="New column"
+                    >
+                      +
+                    </button>
+                    {addPropertyAnchor && (
+                      <AddPropertyMenu
+                        anchorEl={addPropertyAnchor}
+                        onCreate={handleAddProperty}
+                        onClose={() => setAddPropertyAnchor(null)}
+                      />
+                    )}
+                  </th>
                 </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button type="button" className="db-add-row-btn" hidden={readOnly} onClick={handleAddRow}>
-            + New row
-          </button>
-        </div>
+              </thead>
+              <tbody>
+                {shownRows.map((row) => {
+                  const display = rowDisplay(row)
+                  return (
+                  <tr key={row.id} className="db-tr">
+                    {columnIds.map((id) =>
+                      id === TITLE_COLUMN_ID ? (
+                        <td key={id} className={`${cellDragClass(id)} db-td-title`}>
+                          <TitleCell
+                            readOnly={readOnly}
+                            icon={display.icon}
+                            title={display.title}
+                            onOpen={() => setOpenRowId(row.id)}
+                            onRename={(title) => handleRenameRow(row.id, title)}
+                            onArchive={() => handleArchiveRow(row.id)}
+                          />
+                        </td>
+                      ) : (
+                        <td key={id} className={cellDragClass(id)}>
+                          <PropertyCell
+                            property={propertiesById.get(id)!}
+                            value={row.values[id]}
+                            onChange={(v) => handleCellChange(row.id, id, v)}
+                            onOptionsChanged={(options) => handleOptionsChanged(id, options)}
+                            readOnly={readOnly}
+                          />
+                        </td>
+                      ),
+                    )}
+                    <td className="db-td db-td-add" />
+                  </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button type="button" className="db-add-row-btn" hidden={readOnly} onClick={() => void handleAddRow()}>
+              + New row
+            </button>
+          </div>
+        )}
       </div>
 
       {openRow && openRowDisplay && (
@@ -958,6 +1021,14 @@ export default function DatabaseView({
             setOpenRowId(null)
             onOpenPage(openRow.id)
           }}
+          onOpenBeside={
+            onOpenBeside &&
+            (() => {
+              setOpenRowId(null)
+              onOpenBeside(openRow.id)
+            })
+          }
+          container={paneBody}
           onRenameRow={(title) => handleRenameRow(openRow.id, title)}
           onChangeRowIcon={(icon) => handleChangeRowIcon(openRow.id, icon)}
           onPropertyChange={(propertyId, value) => handleCellChange(openRow.id, propertyId, value)}

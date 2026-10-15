@@ -48,6 +48,11 @@ const (
 	// tiny -- shared limit sized for the larger of the two.
 	pageOrderBodyLimit = 64 << 10
 
+	// {row_ids: [...]}: the board's card order lists every row of the
+	// database (~40 bytes per id), so 64 KiB stopped at ~1600 rows; 1 MiB
+	// holds ~25,000, beyond what a board view is usable for.
+	boardOrderBodyLimit = 1 << 20
+
 	propertyBodyLimit = 16 << 10 // {name, type} or {name?, options?} JSON
 	rowValueBodyLimit = 4 << 10  // {value: <one cell>} -- always small
 

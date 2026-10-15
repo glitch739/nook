@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react'
+import { EditorContent, ReactNodeViewRenderer, useEditor, type Editor as TiptapEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -15,6 +15,7 @@ import SlashCommand from './SlashCommand'
 import TableMenu from './TableMenu'
 import { ImageUpload, NookImage, pickFiles, pickImages } from './imageUpload'
 import { FileAttachment } from './fileAttachment'
+import PageMention from './PageMention'
 import './Editor.css'
 
 // `common` is lowlight's curated ~35-language bundle (see
@@ -33,6 +34,37 @@ const CodeBlock = CodeBlockLowlight.extend({
     return ReactNodeViewRenderer(CodeBlockView)
   },
 })
+
+// What a document can hold: shared by the live editor below and the
+// read-only preview of an older version (HistoryModal.tsx), so both
+// read the same schema.
+export function contentExtensions(pageId: string) {
+  return [
+    // codeBlock: false -- CodeBlock above (CodeBlockLowlight + the
+    // language-picker node view) replaces StarterKit's plain one.
+    // undoRedo: false -- Collaboration brings its own Yjs-aware undo
+    // (only undoes *your* changes, never a collaborator's).
+    StarterKit.configure({ codeBlock: false, undoRedo: false }),
+    CodeBlock.configure({ lowlight }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    // Simple tables inside a page's text (not databases): header row,
+    // add/remove rows and columns, merge/split, drag to resize
+    // columns. Tab moves to the next cell and adds a row at the end.
+    TableKit.configure({ table: { resizable: true } }),
+    // Images: pasted/dropped files are uploaded (imageUpload.ts) and
+    // the document only stores their URL.
+    NookImage,
+    FileAttachment,
+    ImageUpload.configure({ pageId }),
+    PageMention,
+  ]
+}
+
+// The open editors by page, so the history window can restore a version
+// through the live one (an ordinary, synced and undoable edit).
+const liveEditors = new Map<string, TiptapEditor>()
+export const liveEditor = (pageId: string) => liveEditors.get(pageId)
 
 // A per-block drag handle + "turn into" menu (click a handle, retype the
 // block) was tried and pulled back out (see DEVLOG) -- it only ever
@@ -128,23 +160,7 @@ function CollabEditor({ provider }: { provider: CollabProvider }) {
   const editor = useEditor({
     editable: false,
     extensions: [
-      // codeBlock: false -- CodeBlock above (CodeBlockLowlight + the
-      // language-picker node view) replaces StarterKit's plain one.
-      // undoRedo: false -- Collaboration brings its own Yjs-aware undo
-      // (only undoes *your* changes, never a collaborator's).
-      StarterKit.configure({ codeBlock: false, undoRedo: false }),
-      CodeBlock.configure({ lowlight }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      // Simple tables inside a page's text (not databases): header row,
-      // add/remove rows and columns, merge/split, drag to resize
-      // columns. Tab moves to the next cell and adds a row at the end.
-      TableKit.configure({ table: { resizable: true } }),
-      // Images: pasted/dropped files are uploaded (imageUpload.ts) and
-      // the document only stores their URL.
-      NookImage,
-      FileAttachment,
-      ImageUpload.configure({ pageId: provider.pageId }),
+      ...contentExtensions(provider.pageId),
       SlashCommand,
       // An empty paragraph renders with zero visible content otherwise
       // -- indistinguishable from "no block is here at all", which is
@@ -162,6 +178,14 @@ function CollabEditor({ provider }: { provider: CollabProvider }) {
 
   useEffect(() => {
     if (editor) provider.setSchema(editor.schema)
+  }, [editor, provider])
+
+  useEffect(() => {
+    if (!editor) return
+    liveEditors.set(provider.pageId, editor)
+    return () => {
+      if (liveEditors.get(provider.pageId) === editor) liveEditors.delete(provider.pageId)
+    }
   }, [editor, provider])
 
   useEffect(() => {

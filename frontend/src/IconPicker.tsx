@@ -34,13 +34,15 @@ function IconGlyph({
   inline?: boolean
 }) {
   const svg = DEFAULT_ICON_SVGS[name]
+  // Stable object, see PageIcon.tsx.
+  const html = useMemo(() => ({ __html: svg ?? '' }), [svg])
   const colorAttr = color === 'default' ? undefined : color
   if (svg) {
     return (
       <span
         className="icon-picker-icon-svg"
         data-icon-color={colorAttr}
-        dangerouslySetInnerHTML={{ __html: svg }}
+        dangerouslySetInnerHTML={html}
       />
     )
   }

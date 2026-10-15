@@ -241,6 +241,12 @@ type rowsResponse struct {
 	// interleaved in the right order, since the title itself isn't one
 	// of the Properties entries. See databases.Store.GetTitleColumnPosition.
 	TitleColumnPosition string `json:"title_column_position"`
+	// BoardOrder is the board view's card order (row ids), kept apart
+	// from the table's row order. See boardOrderHandler.
+	BoardOrder []string `json:"board_order"`
+	// BoardColumns is the board view's column order per grouping
+	// property. See boardColumnsHandler.
+	BoardColumns map[string][]string `json:"board_columns"`
 }
 
 // listRowsHandler handles GET /api/pages/{pageID}/rows
@@ -275,10 +281,23 @@ func (a databasesAPI) listRowsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	boardOrder, err := a.databases.BoardOrder(r.Context(), page.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	boardColumns, err := a.databases.BoardColumns(r.Context(), page.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+
 	resp := rowsResponse{
 		Properties:          make([]propertyResponse, len(props)),
 		Rows:                make([]rowResponse, len(children)),
 		TitleColumnPosition: titlePosition,
+		BoardOrder:          boardOrder,
+		BoardColumns:        boardColumns,
 	}
 	for i, p := range props {
 		resp.Properties[i] = toPropertyResponse(p)
@@ -397,4 +416,91 @@ func (a databasesAPI) peopleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, people)
+}
+
+// boardOrderHandler handles PUT /api/pages/{pageID}/board-order (editor+).
+// Body: {"row_ids": [...]}: the board view's card order. Unlike the
+// column order this is not required to be a full permutation: rows come
+// and go while someone drags, so unknown ids and repeats are dropped and
+// rows left out simply follow the listed ones.
+func (a databasesAPI) boardOrderHandler(w http.ResponseWriter, r *http.Request) {
+	page, ok := a.authorizeDatabasePage(w, r, r.PathValue("pageID"), spaces.RoleEditor)
+	if !ok {
+		return
+	}
+	var req struct {
+		RowIDs []string `json:"row_ids"`
+	}
+	if !httpx.DecodeJSONBody(w, r, &req) {
+		return
+	}
+	children, err := a.pages.ListChildren(r.Context(), page.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	live := make(map[string]bool, len(children))
+	for _, c := range children {
+		live[c.ID] = true
+	}
+	ids := make([]string, 0, len(req.RowIDs))
+	for _, id := range req.RowIDs {
+		if live[id] {
+			ids = append(ids, id)
+			delete(live, id)
+		}
+	}
+	if err := a.databases.SetBoardOrder(r.Context(), page.ID, ids); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// boardColumnsHandler handles PUT /api/pages/{pageID}/board-columns
+// (editor+). Body: {"property_id": ..., "keys": [...]}: the board's
+// column order when it groups by that select or person property, keys
+// being option ids or user ids and "" for the "No <name>" column. Layout
+// only: the property's options and the rows' values stay as they are.
+// Keys aren't checked against the current options (an option can be
+// added or removed meanwhile; unknown keys are simply never shown), only
+// for shape: unique, short, a bounded number.
+func (a databasesAPI) boardColumnsHandler(w http.ResponseWriter, r *http.Request) {
+	page, ok := a.authorizeDatabasePage(w, r, r.PathValue("pageID"), spaces.RoleEditor)
+	if !ok {
+		return
+	}
+	var req struct {
+		PropertyID string   `json:"property_id"`
+		Keys       []string `json:"keys"`
+	}
+	if !httpx.DecodeJSONBody(w, r, &req) {
+		return
+	}
+	prop, err := a.databases.GetProperty(r.Context(), req.PropertyID)
+	if err != nil || prop.PageID != page.ID || (prop.Type != databases.TypeSelect && prop.Type != databases.TypePerson) {
+		http.Error(w, "property_id must be a select or person column of this database", http.StatusBadRequest)
+		return
+	}
+	if len(req.Keys) > 500 {
+		http.Error(w, "too many columns", http.StatusBadRequest)
+		return
+	}
+	seen := make(map[string]bool, len(req.Keys))
+	keys := make([]string, 0, len(req.Keys))
+	for _, k := range req.Keys {
+		if len(k) > 100 {
+			http.Error(w, "column key too long", http.StatusBadRequest)
+			return
+		}
+		if !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	if err := a.databases.SetBoardColumns(r.Context(), page.ID, prop.ID, keys); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

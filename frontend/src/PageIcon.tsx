@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Emoji from './Emoji'
 import { cachedIconSvg, loadIconSvg } from './iconSvg'
 import { FALLBACK_GLYPH, iconColorAttr, lucideIconName } from './pageIcon'
@@ -27,6 +27,12 @@ export default function PageIcon({ icon, className }: { icon: string; className?
     setTrackedName(name)
     setSvg(name ? cachedIconSvg(name) : undefined)
   }
+
+  // The same object while svg is unchanged: React 19 compares
+  // dangerouslySetInnerHTML by reference and would otherwise rebuild the
+  // <svg> on every render -- a click whose press landed on the old one
+  // then never fires (seen on table row icons in a split workspace).
+  const html = useMemo(() => ({ __html: svg ?? '' }), [svg])
 
   useEffect(() => {
     if (!name || cachedIconSvg(name)) return
@@ -72,5 +78,5 @@ export default function PageIcon({ icon, className }: { icon: string; className?
       </span>
     )
   }
-  return <span className={className} data-icon-color={color} dangerouslySetInnerHTML={{ __html: svg }} />
+  return <span className={className} data-icon-color={color} dangerouslySetInnerHTML={html} />
 }

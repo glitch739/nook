@@ -46,3 +46,8 @@
 .page-activity .hint {
   font-size: 0.78rem;
 }
+
+/* "Versions" opens the page history (HistoryModal.tsx). */
+.page-meta-line.page-meta-versions {
+  margin-left: 0.4rem;
+}

@@ -24,7 +24,8 @@ var idName = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4
 //     them (the node was deleted from the text), once older than grace.
 //     The grace period is what keeps undo working: a deleted image can
 //     be brought back with Ctrl+Z long after the delete. Archived pages
-//     keep their content, so their files are kept for a restore.
+//     keep their content, so their files are kept for a restore; so do
+//     files an older version still shows (page history, migration 0019).
 //   - files in the uploads directory with no row at all -- left by pages
 //     deleted for good, or by a crash mid-upload -- once their file is
 //     older than orphanGrace.
@@ -42,7 +43,8 @@ func (s *Store) Sweep(ctx context.Context, grace, orphanGrace time.Duration, dry
 		rows, err := s.db.QueryContext(ctx, `
 			SELECT a.id, a.size_bytes FROM `+t.table+` a
 			WHERE a.created_at < ?
-			  AND NOT EXISTS (SELECT 1 FROM pages p WHERE instr(p.content_json, a.id) > 0);`, cutoff)
+			  AND NOT EXISTS (SELECT 1 FROM pages p WHERE instr(p.content_json, a.id) > 0)
+			  AND NOT EXISTS (SELECT 1 FROM page_versions v WHERE instr(v.content_json, a.id) > 0);`, cutoff)
 		if err != nil {
 			return res, fmt.Errorf("assets: sweep %s: %w", t.table, err)
 		}

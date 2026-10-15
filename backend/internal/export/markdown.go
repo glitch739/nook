@@ -25,15 +25,19 @@ type node struct {
 // output; returning "" keeps the original URL.
 type Links func(url string) string
 
+// Names gives a linked page's current title ("" when it's unknown or not
+// the reader's to see: the link then keeps the name it was made with).
+type Names func(pageID string) string
+
 // Markdown converts a page's content_json to Markdown. Unknown node
 // types keep their text, so nothing written in Nook is silently lost.
-func Markdown(contentJSON string, links Links) (string, error) {
+func Markdown(contentJSON string, links Links, names Names) (string, error) {
 	var doc node
 	if err := json.Unmarshal([]byte(contentJSON), &doc); err != nil {
 		return "", fmt.Errorf("export: parse content: %w", err)
 	}
 	var b strings.Builder
-	w := writer{b: &b, links: links}
+	w := writer{b: &b, links: links, names: names}
 	w.blocks(doc.Content, "")
 	return strings.TrimRight(b.String(), "\n") + "\n", nil
 }
@@ -41,6 +45,7 @@ func Markdown(contentJSON string, links Links) (string, error) {
 type writer struct {
 	b     *strings.Builder
 	links Links
+	names Names
 }
 
 func (w writer) link(url string) string {
@@ -100,7 +105,7 @@ func (w writer) block(n node, indent string) {
 		}
 	case "blockquote":
 		var inner strings.Builder
-		writer{b: &inner, links: w.links}.blocks(n.Content, "")
+		writer{b: &inner, links: w.links, names: w.names}.blocks(n.Content, "")
 		for _, line := range strings.Split(strings.TrimRight(inner.String(), "\n"), "\n") {
 			b.WriteString(indent + "> " + line + "\n")
 		}
@@ -201,6 +206,16 @@ func (w writer) inline(ns []node) string {
 				}
 			}
 			b.WriteString(t)
+		case "pageMention":
+			// A link to another page: its current name, else the one it
+			// was linked with.
+			name := attr(n, "label")
+			if w.names != nil {
+				if cur := w.names(attr(n, "id")); cur != "" {
+					name = cur
+				}
+			}
+			b.WriteString("@" + escape(name))
 		case "hardBreak":
 			b.WriteString("  \n")
 		case "image":
