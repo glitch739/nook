@@ -325,6 +325,55 @@ func TestSpaceStore_ReorderForUser(t *testing.T) {
 	}
 }
 
+// A space bob reaches only through alice's group has no space_members
+// row of his; reordering it must work (it 500'd) without making him a
+// direct member.
+func TestSpaceStore_ReorderForUser_GroupInheritedSpace(t *testing.T) {
+	ctx := context.Background()
+	conn := dbtest.New(t)
+	userStore := users.NewStore(conn)
+	alice, err := userStore.Create(ctx, "alice", "hash", "Alice")
+	if err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	bob, err := userStore.Create(ctx, "bob", "hash", "Bob")
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	aliceGroup := testGroup(t, conn, alice.ID)
+	if err := groups.NewStore(conn).AddMember(ctx, aliceGroup, bob.ID, groups.RoleEditor); err != nil {
+		t.Fatalf("add bob to group: %v", err)
+	}
+
+	store := NewStore(conn)
+	shared, err := store.Create(ctx, "Shared", TypePrivate, alice.ID, aliceGroup)
+	if err != nil {
+		t.Fatalf("create shared: %v", err)
+	}
+	own, err := store.Create(ctx, "Own", TypePrivate, bob.ID, testGroup(t, conn, bob.ID))
+	if err != nil {
+		t.Fatalf("create own: %v", err)
+	}
+
+	for _, order := range [][]string{{shared.ID, own.ID}, {own.ID, shared.ID}} {
+		if err := store.ReorderForUser(ctx, bob.ID, order); err != nil {
+			t.Fatalf("ReorderForUser(%v): %v", order, err)
+		}
+		list, err := store.ListForUser(ctx, bob.ID)
+		if err != nil {
+			t.Fatalf("ListForUser: %v", err)
+		}
+		if len(list) != 2 || list[0].ID != order[0] || list[1].ID != order[1] {
+			t.Fatalf("ListForUser after reorder = %+v, want %v", list, order)
+		}
+	}
+
+	var n int
+	if err := conn.QueryRow(`SELECT COUNT(*) FROM space_members WHERE space_id = ? AND user_id = ?`, shared.ID, bob.ID).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("bob got a direct membership on the shared space (n=%d, err=%v)", n, err)
+	}
+}
+
 func TestSpaceStore_ReorderForUser_CannotTouchAnotherUsersSpace(t *testing.T) {
 	conn := dbtest.New(t)
 	userStore := users.NewStore(conn)

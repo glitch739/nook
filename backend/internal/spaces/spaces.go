@@ -182,13 +182,14 @@ func (s *Store) ListForUser(ctx context.Context, userID string) ([]UserSpace, er
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT DISTINCT
 			s.id, s.name, s.type, s.icon, s.owner_id, s.group_id, s.archived_at, s.created_at,
-			COALESCE(sm.position, '')
+			COALESCE(sm.position, so.position, '')
 		FROM spaces AS s
 		LEFT JOIN space_members AS sm ON sm.space_id = s.id AND sm.user_id = ?
 		LEFT JOIN group_members AS gm ON gm.group_id = s.group_id AND gm.user_id = ?
+		LEFT JOIN space_order AS so ON so.space_id = s.id AND so.user_id = ?
 		WHERE s.archived_at IS NULL AND (sm.user_id IS NOT NULL OR gm.user_id IS NOT NULL)
-		ORDER BY COALESCE(sm.position, '999999-' || s.created_at);
-	`, userID, userID)
+		ORDER BY COALESCE(sm.position, so.position, '999999-' || s.created_at);
+	`, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("spaces: list for user: %w", err)
 	}
@@ -223,7 +224,8 @@ func (s *Store) ListForUser(ctx context.Context, userID string) ([]UserSpace, er
 	return result, nil
 }
 
-// ReorderForUser re-stamps userID's own space_members.position for
+// ReorderForUser re-stamps userID's own space_members.position (or,
+// for a space reached only through a group, space_order.position) for
 // exactly the space IDs given, in that order -- same "validate as a
 // permutation of the caller's current set, then full re-stamp in one
 // transaction" shape as databases.Store.ReorderColumns. Scoped
@@ -249,6 +251,22 @@ func (s *Store) ReorderForUser(ctx context.Context, userID string, spaceIDs []st
 		`, position, id, userID)
 		if err != nil {
 			return fmt.Errorf("spaces: reorder membership: %w", err)
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			continue
+		}
+		// No membership row: reached through a group (ListForUser), so
+		// the position goes to space_order -- only if that group
+		// membership really exists.
+		res, err = tx.ExecContext(ctx, `
+			INSERT INTO space_order (space_id, user_id, position)
+			SELECT s.id, gm.user_id, ? FROM spaces AS s
+			JOIN group_members AS gm ON gm.group_id = s.group_id AND gm.user_id = ?
+			WHERE s.id = ?
+			ON CONFLICT (space_id, user_id) DO UPDATE SET position = excluded.position;
+		`, position, userID, id)
+		if err != nil {
+			return fmt.Errorf("spaces: reorder group space: %w", err)
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return fmt.Errorf("spaces: reorder membership: %w", db.ErrNotFound)

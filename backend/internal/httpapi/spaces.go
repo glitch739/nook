@@ -167,7 +167,7 @@ func (a spacesAPI) reorderSpacesHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := a.spaces.ReorderForUser(r.Context(), userID, req.SpaceIDs); err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

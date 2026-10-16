@@ -229,7 +229,7 @@ func (a groupsAPI) reorderGroupsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := a.groups.ReorderForUser(r.Context(), userID, req.GroupIDs); err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
